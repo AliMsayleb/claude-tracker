@@ -12,11 +12,11 @@ enum SessionDetail {
     private static let maxLength = 200_000
     private static let agentTools: Set<String> = ["Agent", "Task"]
 
-    private static var projectsDirectory: URL {
-        if let override = ProcessInfo.processInfo.environment["CLAUDE_PROJECTS_DIR"], !override.isEmpty {
-            return URL(fileURLWithPath: override)
+    private static func transcript(folder: String, sessionId: String) -> URL? {
+        let candidates = ClaudeConfig.projectsDirectories.map {
+            $0.appendingPathComponent(folder).appendingPathComponent("\(sessionId).jsonl")
         }
-        return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude/projects")
+        return candidates.first { FileManager.default.fileExists(atPath: $0.path) }
     }
 
     private struct Analysis {
@@ -34,8 +34,7 @@ enum SessionDetail {
     private static func analysis(of row: SessionRow) -> Analysis? {
         guard let cwd = row.cwd, let sessionId = row.sessionId else { return nil }
         let folder = String(cwd.map { $0.isASCII && ($0.isLetter || $0.isNumber) ? $0 : "-" })
-        let file = projectsDirectory.appendingPathComponent(folder).appendingPathComponent("\(sessionId).jsonl")
-        guard let stamp = stamp(of: file) else { return nil }
+        guard let file = transcript(folder: folder, sessionId: sessionId), let stamp = stamp(of: file) else { return nil }
         cacheLock.lock()
         defer { cacheLock.unlock() }
         if let cached = cache[file.path], cached.stamp == stamp { return cached.analysis }

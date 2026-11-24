@@ -160,7 +160,7 @@ Build and install from a clone (needs Xcode) with `scripts/install-app.sh`. For 
 
 ## Allow / Deny and questions
 
-They work through one `PermissionRequest` hook in `~/.claude/settings.json`. The same hook lets you answer Claude's multiple-choice questions (`AskUserQuestion`) from the widget: single-choice questions get one-click option buttons in the row, and multi-select or multi-question ones open in the popup with a Submit button. When Claude asks one question, text you type in the popup is sent as your own ("Other") answer. Plan approvals (`ExitPlanMode`) still have to be answered in Claude. Add it from the app (right-click the header > "Set up Allow / Deny buttons…") or from a clone:
+They work through one `PermissionRequest` hook in `~/.claude/settings.json` (and in the `settings.json` of every other Claude config folder the widget finds; see "Several Claude config folders" below). The same hook lets you answer Claude's multiple-choice questions (`AskUserQuestion`) from the widget: single-choice questions get one-click option buttons in the row, and multi-select or multi-question ones open in the popup with a Submit button. When Claude asks one question, text you type in the popup is sent as your own ("Other") answer. Plan approvals (`ExitPlanMode`) still have to be answered in Claude. Add it from the app (right-click the header > "Set up Allow / Deny buttons…") or from a clone:
 
 ```bash
 scripts/install-hook.sh --dry-run   # show the change, write nothing (needs jq)
@@ -180,6 +180,21 @@ The hook never blocks Claude:
 If you work mostly in auto mode, you will rarely see permission rows. The "Needs your answer" and "New reply" rows are the ones you will use most.
 
 The question answering was verified with a real Claude session in a terminal (Claude received the answer chosen from the widget). It has not been verified with a Claude Desktop session.
+
+## Several Claude config folders
+
+If you use `CLAUDE_CONFIG_DIR` to keep more than one Claude Code setup (for example `~/.claude` and `~/.claude-work`), the widget reads all of them: sessions, transcripts and the hook. It looks at, in this order:
+
+- `CLAUDE_CONFIG_DIR`, if the widget itself was started with it set;
+- `~/.claude` and `~/.config/claude`;
+- every other `~/.claude*` folder that contains `sessions`, `projects` or `settings.json` (the widget's own `~/.claude-widget` is skipped, and so are names containing backup, bak, old, copy, tmp or archive);
+- folders you list yourself, because an app started from Spotlight does not see your shell's variables:
+
+```bash
+defaults write com.local.claude-widget extraConfigDirs -array "$HOME/work/claude-config"
+```
+
+`CLAUDE_TRACKER_CONFIG_DIRS=dir1:dir2` replaces the search with exactly those folders. `CLAUDE_SESSIONS_DIR`, `CLAUDE_PROJECTS_DIR` and `CLAUDE_SETTINGS_FILE` also accept several folders or files separated by `:`. The hook scripts (`scripts/install-hook.sh` and friends) cover the same folders. Restart sessions that were already open after setting up the hook.
 
 ## How it works
 

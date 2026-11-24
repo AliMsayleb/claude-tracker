@@ -35,7 +35,9 @@ enum SessionMessenger {
     }
 
     private static func peerToken(for record: SessionRecord) -> String? {
-        let files = (try? FileManager.default.contentsOfDirectory(at: WidgetPaths.sessions, includingPropertiesForKeys: nil)) ?? []
+        let files = ClaudeConfig.sessionsDirectories.flatMap {
+            (try? FileManager.default.contentsOfDirectory(at: $0, includingPropertiesForKeys: nil)) ?? []
+        }
         for file in files where file.lastPathComponent.hasPrefix("\(record.pid).") && file.pathExtension == "key" {
             guard let data = try? Data(contentsOf: file),
                   let key = try? JSONSerialization.jsonObject(with: data) as? [String: Any],

@@ -14,6 +14,10 @@ if options.printHotKey {
     Console.line("\(NewSessionHotKey.label) keyCode=\(NewSessionHotKey.keyCode) modifiers=\(NewSessionHotKey.modifiers)")
     exit(0)
 }
+if options.printConfigDirs {
+    ClaudeConfig.directories.forEach { Console.line($0.path) }
+    exit(0)
+}
 if let id = options.resumeURLId {
     Console.line(NewSessionLauncher.resumeURL(sessionId: id)?.absoluteString ?? "nil")
     exit(0)

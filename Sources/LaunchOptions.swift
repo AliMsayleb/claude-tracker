@@ -42,6 +42,7 @@ struct LaunchOptions {
     let testSearch: Bool
     let testWidgetSize: Bool
     let midDragHeight: Double?
+    let printConfigDirs: Bool
     let widgetCap: Double?
     let testPopup: Bool
     let testReturnKey: Bool
@@ -95,6 +96,7 @@ struct LaunchOptions {
         testSearch = arguments.contains("--test-search")
         testWidgetSize = arguments.contains("--test-widget-size")
         widgetCap = Self.values(after: "--widget-cap", count: 1, in: arguments).flatMap { Double($0[0]) }
+        printConfigDirs = arguments.contains("--print-config-dirs")
         midDragHeight = Self.values(after: "--test-mid-drag", count: 1, in: arguments).flatMap { Double($0[0]) }
         testPopup = arguments.contains("--test-popup")
         testReturnKey = arguments.contains("--test-return-key")

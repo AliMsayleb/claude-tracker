@@ -1,6 +1,13 @@
 #!/bin/bash
 set -euo pipefail
 
+if [ -z "${HOOK_SCRIPT_SINGLE:-}" ]; then
+  while IFS= read -r file; do
+    HOOK_SCRIPT_SINGLE=1 CLAUDE_SETTINGS_FILE="$file" "$0" "$@"
+  done < <("$(dirname "$0")/settings-files.sh")
+  exit 0
+fi
+
 settings="${CLAUDE_SETTINGS_FILE:-$HOME/.claude/settings.json}"
 hook="${CLAUDE_WIDGET_HOME:-$HOME/.claude-widget}/permission-hook.sh"
 command="\"$hook\""

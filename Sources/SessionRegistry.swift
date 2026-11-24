@@ -78,7 +78,9 @@ enum SessionRegistry {
     private static let pidReuseTolerance: TimeInterval = 300
 
     static func loadRecords() -> [SessionRecord] {
-        let files = (try? FileManager.default.contentsOfDirectory(at: WidgetPaths.sessions, includingPropertiesForKeys: nil)) ?? []
+        let files = ClaudeConfig.sessionsDirectories.flatMap {
+            (try? FileManager.default.contentsOfDirectory(at: $0, includingPropertiesForKeys: nil)) ?? []
+        }
         let decoder = JSONDecoder()
         return files
             .filter { $0.pathExtension == "json" }
