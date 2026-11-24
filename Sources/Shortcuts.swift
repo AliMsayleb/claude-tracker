@@ -20,14 +20,15 @@ enum ShortcutCatalog {
         ]),
         ShortcutSection(title: "The widget", items: [
             ShortcutItem(keys: ["Click"], action: "Open a session's popup to read its last message and reply"),
-            ShortcutItem(keys: ["⌘", "Click"], action: "Open the session in Claude Desktop (also marks it read)"),
+            ShortcutItem(keys: ["⌘", "Click"], action: "Open the session in your default app, Claude Desktop or Terminal (choose in the right-click menu; also marks it read)"),
+            ShortcutItem(keys: ["✓ on a row"], action: "Hover an unread row and click ✓ to mark it read"),
             ShortcutItem(keys: ["Allow", "Deny"], action: "Answer a permission request right in the widget"),
             ShortcutItem(keys: ["+"], action: "Add an existing Desktop session (type to search)"),
             ShortcutItem(keys: ["✕ on a row"], action: "Hover a row and click ✕ to remove it from the widget"),
             ShortcutItem(keys: ["⌄"], action: "Collapse the widget to its header, or expand it again"),
             ShortcutItem(keys: ["Drag header"], action: "Move the widget anywhere"),
             ShortcutItem(keys: ["Drag edge"], action: "Resize from the left, right or bottom edge (the size is remembered)"),
-            ShortcutItem(keys: ["Right-click header"], action: "Launch at login, enable the ⌘ shortcut, shortcuts, quit"),
+            ShortcutItem(keys: ["Right-click header"], action: "Choose what ⌘-click opens, set up Allow / Deny, launch at login, enable the ⌘ shortcut, shortcuts, quit"),
         ]),
         ShortcutSection(title: "The reply popup", items: [
             ShortcutItem(keys: ["Return"], action: "Send your reply"),
@@ -39,6 +40,7 @@ enum ShortcutCatalog {
             ShortcutItem(keys: ["⌘", "0"], action: "Reset the text size"),
             ShortcutItem(keys: ["⌘", "Tab"], action: "Switch away and come back; your draft is kept"),
             ShortcutItem(keys: ["⌘", "/"], action: "Show this list"),
+            ShortcutItem(keys: ["Open in Desktop", "Open in Terminal"], action: "Continue the session in either app; both mark it read"),
             ShortcutItem(keys: ["Drag edge"], action: "Resize the popup (the size is remembered)"),
         ]),
         ShortcutSection(title: "Add a session", items: [

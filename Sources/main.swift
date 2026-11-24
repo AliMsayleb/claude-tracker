@@ -52,6 +52,28 @@ if let message = options.send {
     exit(0)
 }
 
+if let hookCommand = options.hookCommand {
+    do {
+        switch hookCommand {
+        case "--install-hook": try HookInstaller.install()
+        case "--uninstall-hook": try HookInstaller.uninstall()
+        default: break
+        }
+        Console.line("hook installed=\(HookInstaller.isInstalled())")
+    } catch {
+        Console.line("failed: \(error.localizedDescription)")
+        exit(1)
+    }
+    exit(0)
+}
+
+if options.testTerminal {
+    Console.line(SessionJumper.terminalScript(cwd: "/work/it's here", sessionId: "11111111-2222-3333-4444-555555555555") ?? "nil")
+    Console.line(SessionJumper.terminalScript(cwd: "relative", sessionId: "11111111-2222-3333-4444-555555555555") ?? "nil")
+    Console.line(SessionJumper.terminalScript(cwd: "/work", sessionId: "bad id; rm -rf /") ?? "nil")
+    exit(0)
+}
+
 if options.printShortcuts {
     Console.line(ShortcutCatalog.markdown)
     exit(0)

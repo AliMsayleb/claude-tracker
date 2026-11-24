@@ -5,6 +5,10 @@ enum HoverPreview {
     static var symbol: String?
 }
 
+enum RowHoverPreview {
+    static var enabled = false
+}
+
 enum ClickModifiers {
     static var current: () -> NSEvent.ModifierFlags = { NSEvent.modifierFlags }
 }
@@ -64,6 +68,7 @@ struct WidgetView: View {
 
     @AppStorage("collapsed") private var collapsed = false
     @AppStorage("widgetMaxHeight") private var maxHeight: Double = 560
+    @AppStorage(OpenTarget.key) private var openTarget = OpenTarget.desktop.rawValue
     @State private var measuredListHeight: CGFloat = 0
 
     private var needsYouCount: Int { store.rows.filter { $0.state.needsYou }.count }
@@ -82,6 +87,14 @@ struct WidgetView: View {
                         get: { LaunchAtLogin.isEnabled },
                         set: { LaunchAtLogin.set($0) }
                     ))
+                    Picker("⌘-click opens", selection: $openTarget) {
+                        Text("⌘-click opens Claude Desktop").tag(OpenTarget.desktop.rawValue)
+                        Text("⌘-click opens Terminal").tag(OpenTarget.terminal.rawValue)
+                    }
+                    .pickerStyle(.inline)
+                    Button(HookInstaller.isInstalled() ? "Remove Allow / Deny hook…" : "Set up Allow / Deny buttons…") {
+                        HookInstaller.confirmAndToggle()
+                    }
                     Button("Shortcuts & tips…") { store.openShortcuts() }
                     Button("Enable double-tap ⌘ shortcut…") { DoubleCommandTap.openAccessibilitySettings() }
                     Button("Quit", action: onQuit)
@@ -115,10 +128,10 @@ struct WidgetView: View {
                 VStack(spacing: 0) {
                     ForEach(store.rows) { row in
                         SessionRowView(
-                            row: row, onDecide: store.decide, onRemove: { store.remove(row) }
+                            row: row, onDecide: store.decide, onRemove: { store.remove(row) }, onMarkRead: { store.markRead(row) }
                         )
                         .onTapGesture {
-                            if ClickModifiers.current().contains(.command) { store.open(row) } else { store.openReply(row) }
+                            if ClickModifiers.current().contains(.command) { store.openPreferred(row) } else { store.openReply(row) }
                         }
                         if row.id != store.rows.last?.id {
                             Rectangle().fill(Color.primary.opacity(0.08)).frame(height: 1)
@@ -213,9 +226,11 @@ struct SessionRowView: View {
     let row: SessionRow
     let onDecide: (PermissionRequest, PermissionDecision) -> Void
     let onRemove: () -> Void
+    let onMarkRead: () -> Void
 
-    @State private var hovering = false
+    @State private var pointerInside = false
 
+    private var hovering: Bool { pointerInside || RowHoverPreview.enabled }
     private var highlighted: Bool { row.state.needsYou || row.state == .unread }
 
     var body: some View {
@@ -234,7 +249,7 @@ struct SessionRowView: View {
             if highlighted { Rectangle().fill(row.color).frame(width: 3) }
         }
         .contentShape(Rectangle())
-        .onHover { hovering = $0 }
+        .onHover { pointerInside = $0 }
     }
 
     private var background: Color {
@@ -261,13 +276,24 @@ struct SessionRowView: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 4)
+            if let agents = row.agents { AgentChip(progress: agents) }
             if hovering {
-                Button(action: onRemove) {
-                    Image(systemName: "xmark.circle.fill").font(.system(size: 15))
+                HStack(spacing: 6) {
+                    if row.state == .unread {
+                        Button(action: onMarkRead) {
+                            Image(systemName: "checkmark.circle.fill").font(.system(size: 15))
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(StatusPalette.done)
+                        .help("Mark as read")
+                    }
+                    Button(action: onRemove) {
+                        Image(systemName: "xmark.circle.fill").font(.system(size: 15))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .help("Remove from widget")
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-                .help("Remove from widget")
             } else {
                 AgeText(since: row.since)
                     .font(.system(size: 12).monospacedDigit())
@@ -392,4 +418,23 @@ struct ResizeHandle: View {
     }
 
     private var cursor: NSCursor { edge == .bottom ? .resizeUpDown : .resizeLeftRight }
+}
+
+struct AgentChip: View {
+    let progress: AgentProgress
+
+    private var color: Color { progress.isRunning ? StatusPalette.working : StatusPalette.done }
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Image(systemName: "person.2.fill").font(.system(size: 9, weight: .bold))
+            Text("\(progress.done)/\(progress.total)").font(.system(size: 11, weight: .semibold).monospacedDigit())
+        }
+        .foregroundStyle(color)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 3)
+        .background(Capsule().fill(color.opacity(0.18)))
+        .fixedSize()
+        .help("\(progress.done) of \(progress.total) sub-agents finished in this turn")
+    }
 }

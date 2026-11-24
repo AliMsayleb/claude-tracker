@@ -79,7 +79,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var lastFittedHeight: CGFloat = 0
     private let resizer = WidgetResizer()
     private var savedDefaults: [String: Any] = [:]
-    private static let sandboxedKeys = ["replyPopupSize", "replyFontScale", "widgetMaxHeight", "collapsed"]
+    private static let sandboxedKeys = ["replyPopupSize", "replyFontScale", "widgetMaxHeight", "collapsed", "openTarget"]
     private var isApplyingReplySize = false
     private var replyHostingView: NSHostingView<ReplyView>!
     private var doubleCommandTap: DoubleCommandTap?
@@ -95,8 +95,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             for key in Self.sandboxedKeys { savedDefaults[key] = UserDefaults.standard.object(forKey: key) }
             for key in ["replyPopupSize", "replyFontScale", "widgetMaxHeight"] { UserDefaults.standard.removeObject(forKey: key) }
         }
-        if options.commandClick { ClickModifiers.current = { .command } }
+        if options.useSample { ClickModifiers.current = { [options] in options.commandClick ? .command : [] } }
         HoverPreview.symbol = options.previewHover
+        RowHoverPreview.enabled = options.previewRowHover
         installMainMenu()
         let backgroundCursorEnabled = BackgroundCursor.enable()
         if options.testCursors { Console.line("background cursor enabled=\(backgroundCursorEnabled)") }

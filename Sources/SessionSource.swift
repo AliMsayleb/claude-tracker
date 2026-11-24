@@ -5,6 +5,7 @@ struct SessionSource {
     let housekeeping: () -> Void
     let load: () -> [SessionRow]
     let jump: (SessionRow) -> Void
+    let openTerminal: (SessionRow) -> Void
     let decide: (PermissionRequest, PermissionDecision) -> Void
     let remove: (SessionRow) -> Void
     let add: (DesktopSession) -> Void
@@ -21,6 +22,7 @@ extension SessionSource {
         housekeeping: LiveSessions.housekeeping,
         load: LiveSessions.rows,
         jump: SessionJumper.jump,
+        openTerminal: SessionJumper.openInTerminal,
         decide: PermissionRequests.decide,
         remove: LiveSessions.remove,
         add: LiveSessions.add,
@@ -36,6 +38,7 @@ extension SessionSource {
         housekeeping: {},
         load: { SampleData.rows },
         jump: { Console.line("jump pid=\($0.pid)") },
+        openTerminal: { Console.line("terminal pid=\($0.pid)") },
         decide: { Console.line("decide \($0.id) \($1.rawValue)") },
         remove: { Console.line("remove pid=\($0.pid)") },
         add: { Console.line("add \($0.id)") },
@@ -61,7 +64,9 @@ enum LiveSessions {
         let running = SessionRegistry.loadRecords()
             .map { record in
                 let own = requests.filter { $0.sessionId == record.sessionId }
-                return SessionRegistry.makeRow(record, requests: own, desktop: record.hostSessionId.flatMap { desktopById[$0] })
+                var row = SessionRegistry.makeRow(record, requests: own, desktop: record.hostSessionId.flatMap { desktopById[$0] })
+                row.agents = SessionDetail.agentProgress(of: row)
+                return row
             }
             .filter { !state.hidden.contains($0.key) }
         let runningKeys = Set(running.map(\.key))
@@ -125,7 +130,7 @@ enum SampleData {
         let samples = [
             sample(1, "Fix reconciliation report", "backend", .needsPermission, now - 140, [command]),
             sample(2, "Review payments PR", "mobile-app", .needsInput, now - 420),
-            sample(3, "Migrate trade updates", "backend", .working, now - 30),
+            sample(3, "Migrate trade updates", "backend", .working, now - 30, agents: AgentProgress(done: 4, total: 6)),
             sample(4, "Claude Code sessions floating widget", "No folder", .working, now - 5),
             sample(5, "Refactor onboarding screens", "mobile-app", .unread, now - 1500,
                    summary: "Refactored 3 screens; tests pass"),
@@ -136,11 +141,11 @@ enum SampleData {
 
     private static func sample(
         _ number: Int32, _ title: String, _ folder: String, _ state: SessionState, _ since: Date,
-        _ requests: [PermissionRequest] = [], summary: String? = nil
+        _ requests: [PermissionRequest] = [], summary: String? = nil, agents: AgentProgress? = nil
     ) -> SessionRow {
         SessionRow(
             pid: number, sessionId: "sample-\(number)", title: title, folder: folder, state: state,
-            since: since, origin: .desktop, hostSessionId: nil, requests: requests, summary: summary
+            since: since, origin: .desktop, hostSessionId: nil, requests: requests, summary: summary, cwd: nil, agents: agents
         )
     }
 }

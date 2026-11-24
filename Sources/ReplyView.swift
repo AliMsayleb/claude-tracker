@@ -74,6 +74,7 @@ struct ReplyView: View {
                     .textSelection(.enabled)
                     .padding(22)
             }
+            if row.state == .needsPermission { permissionNotice(for: row) }
             composer(for: row)
         }
     }
@@ -87,18 +88,24 @@ struct ReplyView: View {
                     .font(.system(size: 13 * zoom.scale)).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer()
-            Button { store.openShortcuts() } label: {
-                Image(systemName: "questionmark").font(.system(size: 12, weight: .bold)).frame(width: 28, height: 28)
-                    .background(Circle().fill(Color.primary.opacity(0.1)))
-            }
-            .buttonStyle(.plain)
-            .help("Shortcuts & tips (⌘/)")
             Button { store.open(row) } label: {
                 Label("Open in Desktop", systemImage: "arrow.up.forward.app").font(.system(size: 13, weight: .medium))
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 12).padding(.vertical, 7)
             .background(Capsule().fill(Color.primary.opacity(0.1)))
+            Button { store.openTerminal(row) } label: {
+                Label("Open in Terminal", systemImage: "terminal").font(.system(size: 13, weight: .medium))
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 12).padding(.vertical, 7)
+            .background(Capsule().fill(Color.primary.opacity(0.1)))
+            Button { store.openShortcuts() } label: {
+                Image(systemName: "questionmark").font(.system(size: 12, weight: .bold)).frame(width: 28, height: 28)
+                    .background(Circle().fill(Color.primary.opacity(0.1)))
+            }
+            .buttonStyle(.plain)
+            .help("Shortcuts & tips (⌘/)")
             Button(action: onClose) {
                 Image(systemName: "xmark").font(.system(size: 12, weight: .bold)).frame(width: 28, height: 28)
                     .background(Circle().fill(Color.primary.opacity(0.1)))
@@ -110,13 +117,34 @@ struct ReplyView: View {
         .padding(.vertical, 16)
     }
 
+    private func permissionNotice(for row: SessionRow) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Waiting for your permission", systemImage: "lock.shield.fill")
+                .font(.system(size: 13 * zoom.scale, weight: .semibold))
+                .foregroundStyle(StatusPalette.permission)
+            if let request = row.request {
+                RequestCard(request: request, moreCount: row.requests.count - 1) { decision in
+                    store.decide(request, decision)
+                }
+            } else {
+                Text("A typed reply can't approve a permission request. Answer it in Claude Desktop or Terminal, or install the Allow / Deny hook (see the README) to answer it here.")
+                    .font(.system(size: 13 * zoom.scale)).foregroundStyle(.secondary)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(StatusPalette.permission.opacity(0.1)))
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+    }
+
     private func composer(for row: SessionRow) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             if let status = store.sendStatus {
                 Text(status).font(.system(size: 13)).foregroundStyle(.red)
             }
             VStack(alignment: .leading, spacing: 10) {
-                TextField("Reply to this session…", text: $text, axis: .vertical)
+                TextField(row.state == .needsPermission ? "Add instructions (this does not approve the request)…" : "Reply to this session…", text: $text, axis: .vertical)
                     .textFieldStyle(.plain)
                     .font(.system(size: 17 * zoom.scale))
                     .lineLimit(3...9)

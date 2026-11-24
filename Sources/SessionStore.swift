@@ -35,6 +35,21 @@ final class SessionStore: ObservableObject {
         source.shutdown()
     }
 
+    func openPreferred(_ row: SessionRow) {
+        if OpenTarget.current == .terminal { openTerminal(row) } else { open(row) }
+    }
+
+    func openTerminal(_ row: SessionRow) {
+        source.markSeen(row)
+        source.openTerminal(row)
+        refresh()
+    }
+
+    func markRead(_ row: SessionRow) {
+        source.markSeen(row)
+        refresh()
+    }
+
     func open(_ row: SessionRow) {
         source.markSeen(row)
         source.jump(row)

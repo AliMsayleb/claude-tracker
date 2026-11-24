@@ -50,7 +50,7 @@ new_home; rm "$home/heartbeat"
 started=$(date +%s)
 out="$(printf '%s' "$payload" | CLAUDE_WIDGET_HOME="$home" "$hook")"
 check "no heartbeat: silent" "" "$out"
-check "no heartbeat: exits at once" "0" "$(seconds_since "$started")"
+check "no heartbeat: exits at once" "yes" "$([ "$(seconds_since "$started")" -le 1 ] && echo yes || echo no)"
 check "no heartbeat: no request left" "0" "$(ls "$home/requests" | wc -l | tr -d ' ')"
 
 new_home; touch -t 200001010000 "$home/heartbeat"

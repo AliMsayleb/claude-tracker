@@ -55,6 +55,7 @@ struct SessionRow: Identifiable, Equatable, Codable {
     var running = true
     var summary: String?
     var cwd: String?
+    var agents: AgentProgress?
 
     static let placeholder = SessionRow(
         pid: 0, sessionId: nil, title: "", folder: "", state: .idle, since: nil, origin: .desktop, hostSessionId: nil

@@ -11,8 +11,20 @@ click() {
 check "Allow button reports an allow decision" "decide sample-request allow" "$(click 53 216)"
 check "Deny button reports a deny decision" "decide sample-request deny" "$(click 134 216)"
 check "plain click opens the popup and does not mark the session read" "" "$(click 100 272)"
+domain_for_target="com.local.claude-widget"
+previous_target="$(defaults read "$domain_for_target" openTarget 2> /dev/null || echo unset)"
+set_target() { defaults write "$domain_for_target" openTarget -string "$1"; }
+restore_target() { if [ "$previous_target" = "unset" ]; then defaults delete "$domain_for_target" openTarget 2> /dev/null; else defaults write "$domain_for_target" openTarget -string "$previous_target"; fi; }
+set_target desktop
 check "command-click opens Desktop and marks the session read" "seen pid=3 jump pid=3" "$(timeout 20 "$binary" --sample --command-click 100 429 | tr '
 ' ' ' | sed 's/ $//')"
+set_target terminal
+check "command-click opens Terminal when that is the chosen default" "seen pid=3 terminal pid=3" "$(timeout 20 "$binary" --sample --command-click 100 429 | tr '\n' ' ' | sed 's/ $//')"
+restore_target
+
+check "the green check on an unread row marks it read" "seen pid=5" "$(timeout 20 "$binary" --sample --preview-row-hover --click 270 327)"
+check "the cross on a row removes it" "remove pid=5" "$(timeout 20 "$binary" --sample --preview-row-hover --click 295 327)"
+
 check "plain click on the request text opens the popup only" "" "$(click 100 150)"
 
 work="$(mktemp -d)"

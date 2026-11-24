@@ -18,6 +18,9 @@ struct LaunchOptions {
     let testMarkdown: Bool
     let testTyping: Bool
     let testResize: Bool
+    let hookCommand: String?
+    let previewRowHover: Bool
+    let testTerminal: Bool
     let openShortcuts: Bool
     let printShortcuts: Bool
     let testCursors: Bool
@@ -43,6 +46,9 @@ struct LaunchOptions {
         testMarkdown = arguments.contains("--test-markdown")
         testTyping = arguments.contains("--test-typing")
         testResize = arguments.contains("--test-resize")
+        hookCommand = ["--install-hook", "--uninstall-hook", "--hook-status"].first { arguments.contains($0) }
+        previewRowHover = arguments.contains("--preview-row-hover")
+        testTerminal = arguments.contains("--test-terminal-script")
         openShortcuts = arguments.contains("--open-shortcuts")
         printShortcuts = arguments.contains("--print-shortcuts")
         testCursors = arguments.contains("--test-cursors")

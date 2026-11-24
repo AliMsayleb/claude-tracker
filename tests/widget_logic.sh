@@ -92,8 +92,18 @@ mkdir -p "$projects/-work-project"
   echo '{"type":"assistant","message":{"content":[{"type":"text","text":"Latest answer"},{"type":"tool_use","name":"Bash"}]}}'
   echo '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash"}]}}'
   echo '{"type":"user","message":{"content":"tool result"}}'
+  echo '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"old1","name":"Agent"}]}}'
+  echo '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"old1"}]}}'
+  echo '{"type":"user","message":{"content":"next question"}}'
+  echo '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"a1","name":"Agent"},{"type":"tool_use","id":"a2","name":"Task"},{"type":"tool_use","id":"a3","name":"Agent"}]}}'
+  echo '{"type":"assistant","isSidechain":true,"message":{"content":[{"type":"tool_use","id":"side1","name":"Agent"}]}}'
+  echo '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"a1"},{"type":"tool_result","tool_use_id":"a2"}]}}'
+  echo '{"type":"user","message":{"content":"Another Claude session sent a message: keep going"}}'
 } > "$projects/-work-project/sess-f.jsonl"
 check "expanded detail is the last assistant text" "Latest answer" "$("$binary" --detail "$pid_f")"
+check "sub-agent counter counts only the current turn, ignoring side chains and replies sent from the widget" "2/3" \
+  "$(dump | jq -r '[.[] | select(.title == "Idle session")][0].agents | "\(.done)/\(.total)"')"
+check "no counter without sub-agents" "null" "$(dump | jq -c '[.[] | select(.title == "Working session")][0].agents')"
 check "detail is empty when there is no transcript" "" "$("$binary" --detail "$pid_c")"
 rm -rf "$projects"; unset CLAUDE_PROJECTS_DIR
 
