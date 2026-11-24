@@ -117,6 +117,7 @@ struct CircleIconButton: View {
     let symbol: String
     var size: CGFloat = 28
     var hoverColor: Color = .primary
+    var tint: Color?
     let action: () -> Void
 
     @State private var inside = false
@@ -127,9 +128,9 @@ struct CircleIconButton: View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: size * 0.42, weight: .bold))
-                .foregroundStyle(hovering ? Color.primary : Color.secondary)
+                .foregroundStyle(hovering ? Color.primary : (tint ?? Color.secondary))
                 .frame(width: size, height: size)
-                .background(Circle().fill(hovering ? hoverColor.opacity(0.22) : Color.primary.opacity(0.08)))
+                .background(Circle().fill(hovering ? hoverColor.opacity(0.22) : (tint ?? Color.primary).opacity(tint == nil ? 0.08 : 0.16)))
                 .scaleEffect(hovering ? 1.1 : 1)
                 .animation(.easeOut(duration: 0.12), value: hovering)
         }
@@ -137,3 +138,5 @@ struct CircleIconButton: View {
         .onHover { inside = $0 }
     }
 }
+
+enum HandOffPreview { static var enabled = false }

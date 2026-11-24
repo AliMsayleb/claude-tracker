@@ -129,9 +129,9 @@ struct WidgetView: View {
                 VStack(spacing: 0) {
                     ForEach(store.rows) { row in
                         SessionRowView(
-                            row: row, canHandOff: row.sessionId.map(store.readyForDesktop.contains) ?? false,
+                            row: row, canHandOff: row.readyForDesktop,
                             onDecide: store.decide, onAnswer: store.answer, onRemove: { store.remove(row) },
-                            onMarkRead: { store.markRead(row) }, onOpenPopup: { store.openReply(row) }, onHandOff: { store.handOff(row) }
+                            onMarkRead: { store.markRead(row) }, onMarkUnread: { store.markUnread(row) }, onOpenPopup: { store.openReply(row) }, onHandOff: { store.handOff(row) }
                         )
                         .onTapGesture {
                             if ClickModifiers.current().contains(.command) { store.openPreferred(row) } else { store.openReply(row) }
@@ -230,6 +230,7 @@ struct SessionRowView: View {
     let onAnswer: (PermissionRequest, [String: String]) -> Void
     let onRemove: () -> Void
     let onMarkRead: () -> Void
+    let onMarkUnread: () -> Void
     let onOpenPopup: () -> Void
     let onHandOff: () -> Void
 
@@ -289,11 +290,8 @@ struct SessionRowView: View {
             Spacer(minLength: 4)
             if let agents = row.agents { AgentChip(progress: agents) }
             if canHandOff {
-                Button(action: onHandOff) {
-                    Label("Desktop", systemImage: "arrow.up.forward.app").lineLimit(1).fixedSize()
-                }
-                .buttonStyle(PillButtonStyle(tint: StatusPalette.done))
-                .help("Ready: open this session in Claude Desktop")
+                CircleIconButton(symbol: "arrow.up.forward.app", size: 22, hoverColor: StatusPalette.done, tint: StatusPalette.done, action: onHandOff)
+                    .help("Ready: open this session in Claude Desktop")
             }
             if hovering {
                 HStack(spacing: 6) {
@@ -305,6 +303,14 @@ struct SessionRowView: View {
                         .foregroundStyle(StatusPalette.done)
                         .help("Mark as read")
                     }
+                    if row.state != .unread, row.hostSessionId != nil {
+                        Button(action: onMarkUnread) {
+                            Image(systemName: "envelope.badge.fill").font(.system(size: 14))
+                        }
+                        .buttonStyle(PressScaleStyle())
+                        .foregroundStyle(StatusPalette.unread)
+                        .help("Mark as unread, to come back to it later")
+                    }
                     Button(action: onRemove) {
                         Image(systemName: "xmark.circle.fill").font(.system(size: 15))
                     }
@@ -315,6 +321,8 @@ struct SessionRowView: View {
             } else {
                 AgeText(since: row.since)
                     .font(.system(size: 12).monospacedDigit())
+                    .lineLimit(1)
+                    .fixedSize()
                     .foregroundStyle(.secondary)
             }
         }

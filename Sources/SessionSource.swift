@@ -13,6 +13,7 @@ struct SessionSource {
     let candidates: () -> [DesktopSession]
     let detail: (SessionRow) -> String?
     let markSeen: (SessionRow) -> Void
+    let markUnread: (SessionRow) -> Void
     let send: (SessionRow, String) throws -> Void
     let startSession: (NewSessionRequest, @escaping (Result<String, NewSessionError>) -> Void) -> Void
     let handOff: (String) -> Void
@@ -33,9 +34,10 @@ extension SessionSource {
         candidates: LiveSessions.candidates,
         detail: SessionDetail.lastAssistantText,
         markSeen: LiveSessions.markSeen,
+        markUnread: LiveSessions.markUnread,
         send: { try SessionMessenger.send($1, to: $0) },
         startSession: NewSessionLauncher.start,
-        handOff: HandOffCenter.shared.handOff,
+        handOff: HandOffCenter.handOff,
         shutdown: PermissionRequests.stopBeating
     )
 
@@ -57,6 +59,7 @@ extension SessionSource {
         },
         detail: { _ in "## Done\nI **refactored** 3 screens and ran `swift test`.\n- First item with *emphasis*\n- Second item\n1. Numbered step\n```\nlet answer = 42\n```" },
         markSeen: { Console.line("seen pid=\($0.pid)") },
+        markUnread: { Console.line("unread pid=\($0.pid)") },
         send: { Console.line("send pid=\($0.pid) \($1)") },
         startSession: { request, completion in
             do { try NewSessionLauncher.validate(request) } catch {
@@ -66,10 +69,7 @@ extension SessionSource {
             Console.line("start \(request.target.rawValue) \(request.folder ?? "none") \(request.prompt.replacingOccurrences(of: "\n", with: "\\n"))")
             completion(.success("started"))
         },
-        handOff: { id in
-            Console.line("handoff \(id)")
-            HandOffCenter.shared.consume(id)
-        },
+        handOff: { Console.line("handoff \($0)") },
         shutdown: {}
     )
 }
@@ -78,7 +78,7 @@ enum LiveSessions {
     static func rows() -> [SessionRow] {
         let state = WidgetStateStore.load()
         let requests = PermissionRequests.load()
-        let desktop = DesktopSessions.all(seen: state.seen)
+        let desktop = DesktopSessions.all(seen: state.seen, unreadMarks: state.unreadMarks)
         let desktopById = Dictionary(desktop.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         let running = SessionRegistry.loadRecords()
             .map { record in
@@ -105,6 +105,11 @@ enum LiveSessions {
     static func markSeen(_ row: SessionRow) {
         guard let host = row.hostSessionId else { return }
         WidgetStateStore.update { $0.seen[host] = Date().timeIntervalSince1970 * 1000 }
+    }
+
+    static func markUnread(_ row: SessionRow) {
+        guard let host = row.hostSessionId else { return }
+        WidgetStateStore.update { $0.unreadMarks[host] = Date().timeIntervalSince1970 * 1000 }
     }
 
     static func add(_ session: DesktopSession) {
@@ -164,18 +169,18 @@ enum SampleData {
             sample(4, "Claude Code sessions floating widget", "No folder", .working, now - 5),
             sample(5, "Refactor onboarding screens", "mobile-app", .unread, now - 1500,
                    summary: "Refactored 3 screens; tests pass"),
-            sample(6, "Write release notes", "docs", .idle, now - 7200),
+            sample(6, "Write release notes", "docs", .idle, now - 7200, ready: HandOffPreview.enabled),
         ]
         return samples.sorted(by: SessionRegistry.isListedBefore)
     }
 
     private static func sample(
         _ number: Int32, _ title: String, _ folder: String, _ state: SessionState, _ since: Date,
-        _ requests: [PermissionRequest] = [], summary: String? = nil, agents: AgentProgress? = nil
+        _ requests: [PermissionRequest] = [], summary: String? = nil, agents: AgentProgress? = nil, ready: Bool = false
     ) -> SessionRow {
         SessionRow(
             pid: number, sessionId: "sample-\(number)", title: title, folder: folder, state: state,
-            since: since, origin: .desktop, hostSessionId: nil, requests: requests, summary: summary, cwd: nil, agents: agents
+            since: since, origin: .desktop, hostSessionId: "local_sample-\(number)", requests: requests, summary: summary, cwd: nil, agents: agents, readyForDesktop: ready
         )
     }
 }

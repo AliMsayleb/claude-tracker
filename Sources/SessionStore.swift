@@ -11,7 +11,6 @@ final class SessionStore: ObservableObject {
     @Published private(set) var shortcutsOpen = false
     @Published private(set) var newSessionOpen = false
     @Published private(set) var updateVersion: String?
-    @Published private(set) var readyForDesktop = Set<String>()
 
     let newSession: NewSessionModel
     private let source: SessionSource
@@ -21,13 +20,11 @@ final class SessionStore: ObservableObject {
     private var refreshing = false
     private var refreshAgain = false
     private let queue = DispatchQueue(label: "claude-widget.refresh", qos: .userInitiated)
-    private var handOffSubscription: AnyCancellable?
 
     init(source: SessionSource) {
         self.source = source
         newSession = NewSessionModel(starter: source.startSession)
         newSession.onFinished = { [weak self] in self?.closeNewSession() }
-        handOffSubscription = HandOffCenter.shared.$ready.receive(on: DispatchQueue.main).sink { [weak self] in self?.readyForDesktop = $0 }
     }
 
     func start() {
@@ -56,6 +53,12 @@ final class SessionStore: ObservableObject {
     func handOff(_ row: SessionRow) {
         guard let sessionId = row.sessionId else { return }
         source.handOff(sessionId)
+    }
+
+    func markUnread(_ row: SessionRow) {
+        source.markUnread(row)
+        if replyKey == row.key { closeReply() }
+        refresh()
     }
 
     func markRead(_ row: SessionRow) {

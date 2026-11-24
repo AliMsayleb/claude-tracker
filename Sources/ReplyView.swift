@@ -98,6 +98,10 @@ struct ReplyView: View {
                 Label("Open in Terminal", systemImage: "terminal").font(.system(size: 13, weight: .medium))
             }
             .buttonStyle(PillButtonStyle())
+            if row.hostSessionId != nil {
+                CircleIconButton(symbol: "envelope.badge", size: 28, hoverColor: StatusPalette.unread) { store.markUnread(row) }
+                    .help("Mark as unread and close, to come back to it later")
+            }
             CircleIconButton(symbol: "questionmark", size: 28) { store.openShortcuts() }
                 .help("Shortcuts & tips (⌘/)")
             CircleIconButton(symbol: "xmark", size: 28, action: onClose)

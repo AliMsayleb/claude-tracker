@@ -52,16 +52,6 @@ check "the window refuses to start with no prompt" "" "$(timeout 20 "$binary" --
 timeout 20 "$binary" --sample --open-new-session --snapshot "$work/w.png"
 check "the new-session window opens" "yes" "$([ -f "$work/w.png-newsession.png" ] && echo yes || echo no)"
 
-cat > "$work/agents.json" << JSON
-[{"name":"other","cwd":"$folder","sessionId":"11111111-1111-1111-1111-111111111111"},
- {"name":"Fix it","cwd":"$folder","sessionId":"22222222-2222-2222-2222-222222222222"},
- {"name":"Fix it","cwd":"/elsewhere","sessionId":"33333333-3333-3333-3333-333333333333"},
- {"name":"Fix it","cwd":"$folder","sessionId":"44444444-4444-4444-4444-444444444444"}]
-JSON
-check "adopt: finds the new session by name and folder" "22222222-2222-2222-2222-222222222222" "$("$binary" --print-adopt "$work/agents.json" "Fix it" "$folder" "none")"
-check "adopt: skips sessions that already existed" "44444444-4444-4444-4444-444444444444" "$("$binary" --print-adopt "$work/agents.json" "Fix it" "$folder" "22222222-2222-2222-2222-222222222222")"
-check "adopt: reports none when nothing matches" "none" "$("$binary" --print-adopt "$work/agents.json" "Nope" "$folder" "none")"
-check "adopt: a session in another folder is ignored" "none" "$("$binary" --print-adopt "$work/agents.json" "Fix it" "/elsewhere" "33333333-3333-3333-3333-333333333333")"
 check "resume link uses the session id" "claude://resume?session=22222222-2222-2222-2222-222222222222" "$("$binary" --print-resume-url 22222222-2222-2222-2222-222222222222)"
 check "resume link refuses anything that is not a session id" "nil" "$("$binary" --print-resume-url "x&folder=/")"
 check "background → desktop uses the background launch script" "0" "$("$binary" --print-new-session backgroundDesktop "$folder" "hi" | diff -q - <("$binary" --print-new-session background "$folder" "hi") > /dev/null; echo $?)"
@@ -91,12 +81,5 @@ check "the new-session window can be resized" "1800x1400" "$(sips -g pixelWidth 
 timeout 20 "$binary" --sample --open-new-session --snapshot "$work/normal.png" > /dev/null
 check "the window opens at its normal size again after a resize" "1200x1080" "$(sips -g pixelWidth -g pixelHeight "$work/normal.png-newsession.png" | awk '/pixelWidth/ {w=$2} /pixelHeight/ {h=$2} END {print w "x" h}')"
 
-cat > "$work/status.json" << JSON
-[{"sessionId":"aaaa","status":"idle"},{"sessionId":"bbbb","status":"busy"},{"sessionId":"cccc","status":null}]
-JSON
-check "hand-over waits while the session is busy" "not idle" "$("$binary" --print-idle "$work/status.json" bbbb)"
-check "hand-over waits while the session has no status yet" "not idle" "$("$binary" --print-idle "$work/status.json" cccc)"
-check "hand-over goes ahead when the session is idle" "idle" "$("$binary" --print-idle "$work/status.json" aaaa)"
-check "hand-over ignores sessions it does not know" "not idle" "$("$binary" --print-idle "$work/status.json" zzzz)"
 
 finish

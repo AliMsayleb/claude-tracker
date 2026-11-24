@@ -15,6 +15,7 @@ struct WidgetState: Codable, Equatable {
     var hidden: Set<String> = []
     var pinned: [String] = []
     var seen: [String: Double] = [:]
+    var unreadMarks: [String: Double] = [:]
 
     init() {}
 
@@ -23,6 +24,7 @@ struct WidgetState: Codable, Equatable {
         hidden = try values.decodeIfPresent(Set<String>.self, forKey: .hidden) ?? []
         pinned = try values.decodeIfPresent([String].self, forKey: .pinned) ?? []
         seen = try values.decodeIfPresent([String: Double].self, forKey: .seen) ?? [:]
+        unreadMarks = try values.decodeIfPresent([String: Double].self, forKey: .unreadMarks) ?? [:]
     }
 }
 
@@ -80,7 +82,12 @@ enum DesktopSessions {
         return record
     }
 
-    static func all(seen: [String: Double] = [:]) -> [DesktopSession] {
+    static func isUnread(turnEnded: Double, focused: Double, seen: Double, marked: Double) -> Bool {
+        let lastLook = max(focused, seen)
+        return turnEnded > lastLook || marked > lastLook
+    }
+
+    static func all(seen: [String: Double] = [:], unreadMarks: [String: Double] = [:]) -> [DesktopSession] {
         guard let files = FileManager.default.enumerator(at: directory, includingPropertiesForKeys: nil) else { return [] }
         return files.compactMap { $0 as? URL }
             .filter { $0.lastPathComponent.hasPrefix("local_") && $0.pathExtension == "json" }
@@ -92,7 +99,10 @@ enum DesktopSessions {
                     title: $0.title ?? "Untitled session",
                     folder: SessionRegistry.displayFolder($0.cwd ?? ""),
                     lastActivity: Date(timeIntervalSince1970: ($0.lastActivityAt ?? 0) / 1000),
-                    isUnread: ($0.lastTurnEdgeAt ?? 0) > max($0.lastFocusedAt ?? 0, seen[$0.sessionId] ?? 0),
+                    isUnread: isUnread(
+                        turnEnded: $0.lastTurnEdgeAt ?? 0, focused: $0.lastFocusedAt ?? 0,
+                        seen: seen[$0.sessionId] ?? 0, marked: unreadMarks[$0.sessionId] ?? 0
+                    ),
                     summary: [$0.postTurnSummary?.needs_action, $0.postTurnSummary?.status_detail]
                         .compactMap { $0 }.first { !$0.isEmpty },
                     cliSessionId: $0.cliSessionId,

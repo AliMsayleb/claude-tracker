@@ -490,7 +490,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             store.newSession.prompt = draft.prompt
         }
         if options.noFolder { store.newSession.folder = nil }
-        if options.previewHandOff { HandOffCenter.shared.markReady("sample-6") }
         if options.openNewSession {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in self?.store.openNewSession() }
         }

@@ -179,4 +179,32 @@ check "decide deny overwrites" "deny" "$(cat "$home/requests/req-current.decisio
 "$binary" --decide no-such-request allow > /dev/null
 check "decide unknown request fails" "1" "$?"
 
+write_session 1 sess-spare "Spare process session" busy "" "$now_ms" "$now_ms"
+check "a session started in a process that was already running is listed" "1" \
+  "$(dump | jq '[.[] | select(.title == "Spare process session")] | length')"
+check "a reused pid is still hidden" "0" \
+  "$(dump | jq '[.[] | select(.title == "Reused pid session")] | length')"
+
+spawn_live_process; bg_idle=$last_pid
+spawn_live_process; bg_busy=$last_pid
+write_session "$bg_idle" sess-bg-idle "Background idle" idle "" "$now_ms" "$now_ms"
+write_session "$bg_busy" sess-bg-busy "Background busy" busy "" "$now_ms" "$now_ms"
+for pid in "$bg_idle" "$bg_busy"; do jq '. + {kind: "bg"}' "$sessions/$pid.json" > "$sessions/$pid.tmp" && mv "$sessions/$pid.tmp" "$sessions/$pid.json"; done
+check "a finished background session is ready for Desktop" "true" "$(dump | jq -r '.[] | select(.title == "Background idle") | .readyForDesktop')"
+check "a background session that is still working is not ready" "false" "$(dump | jq -r '.[] | select(.title == "Background busy") | .readyForDesktop')"
+check "an ordinary idle session is not offered for hand-over" "false" "$(dump | jq -r '.[] | select(.title == "Idle session") | .readyForDesktop')"
+
+spawn_live_process; mark_pid=$last_pid
+write_session "$mark_pid" sess-mark "Marked session" idle "" "$now_ms" "$now_ms"
+jq -n '{sessionId: "local_sess-mark", title: "x", cwd: "/w", isArchived: false, lastActivityAt: 5, lastFocusedAt: 5000, lastTurnEdgeAt: 2000}' > "$desktop/local_sess-mark.json"
+state_of() { dump | jq -r '.[] | select(.title == "Marked session") | .state'; }
+check "a session you already looked at is not unread" "idle" "$(state_of)"
+echo "{\"unreadMarks\": {\"local_sess-mark\": 6000}}" > "$home/state.json"
+check "marking a session unread makes it unread" "unread" "$(state_of)"
+echo "{\"unreadMarks\": {\"local_sess-mark\": 6000}, \"seen\": {\"local_sess-mark\": 7000}}" > "$home/state.json"
+check "looking at it again clears the mark" "idle" "$(state_of)"
+echo "{\"unreadMarks\": {\"local_sess-mark\": 4000}}" > "$home/state.json"
+check "opening it in Desktop after marking clears the mark" "idle" "$(state_of)"
+rm -f "$home/state.json"
+
 finish

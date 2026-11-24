@@ -1,17 +1,6 @@
 import AppKit
 
 let options = LaunchOptions(CommandLine.arguments)
-if let command = options.adoptCommand {
-    let known = Set(command[3].split(separator: ",").map(String.init))
-    let data = FileManager.default.contents(atPath: command[0]) ?? Data()
-    Console.line(NewSessionLauncher.newSessionId(in: data, excluding: known, name: command[1], folder: command[2]) ?? "none")
-    exit(0)
-}
-if let command = options.idleCommand {
-    let data = FileManager.default.contents(atPath: command[0]) ?? Data()
-    Console.line(NewSessionLauncher.isIdle(in: data, sessionId: command[1]) ? "idle" : "not idle")
-    exit(0)
-}
 if let command = options.popupScreenCommand {
     func rect(_ text: String) -> NSRect {
         let v = text.split(separator: ",").compactMap { Double($0) }

@@ -40,6 +40,7 @@ struct SessionRecord: Decodable {
     let hostSessionId: String?
     let procStart: String?
     let messagingSocketPath: String?
+    let kind: String?
 }
 
 struct SessionRow: Identifiable, Equatable, Codable {
@@ -56,6 +57,7 @@ struct SessionRow: Identifiable, Equatable, Codable {
     var summary: String?
     var cwd: String?
     var agents: AgentProgress?
+    var readyForDesktop = false
 
     static let placeholder = SessionRow(
         pid: 0, sessionId: nil, title: "", folder: "", state: .idle, since: nil, origin: .desktop, hostSessionId: nil
@@ -99,7 +101,8 @@ enum SessionRegistry {
             hostSessionId: record.hostSessionId,
             requests: state.needsYou ? requests : [],
             summary: summary(for: state, desktop: desktop),
-            cwd: record.cwd
+            cwd: record.cwd,
+            readyForDesktop: record.kind == "bg" && record.status == "idle"
         )
     }
 
@@ -135,7 +138,7 @@ enum SessionRegistry {
     private static func isLive(_ record: SessionRecord) -> Bool {
         guard kill(record.pid, 0) == 0 || errno == EPERM else { return false }
         guard let startedAt = record.startedAt, let processStart = ProcessClock.startTime(of: record.pid) else { return true }
-        return abs(startedAt / 1000 - processStart.timeIntervalSince1970) < pidReuseTolerance
+        return processStart.timeIntervalSince1970 - startedAt / 1000 < pidReuseTolerance
     }
 
     private static func displayTitle(_ record: SessionRecord) -> String {
