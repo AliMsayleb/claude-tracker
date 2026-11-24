@@ -64,11 +64,13 @@ private struct ListHeightKey: PreferenceKey {
 struct WidgetView: View {
     @ObservedObject var store: SessionStore
     let resizer: WidgetResizer
+    let updates: UpdateController?
     let onQuit: () -> Void
 
     @AppStorage("collapsed") private var collapsed = false
     @AppStorage("widgetMaxHeight") private var maxHeight: Double = 560
     @AppStorage(OpenTarget.key) private var openTarget = OpenTarget.desktop.rawValue
+    @AppStorage("autoCheckUpdates") private var autoUpdates = true
     @State private var measuredListHeight: CGFloat = 0
 
     private var needsYouCount: Int { store.rows.filter { $0.state.needsYou }.count }
@@ -81,7 +83,7 @@ struct WidgetView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HeaderView(needsYouCount: needsYouCount, collapsed: $collapsed, onAdd: store.openPicker, onQuit: onQuit)
+            HeaderView(needsYouCount: needsYouCount, collapsed: $collapsed, updateVersion: store.updateVersion, onUpdate: { updates?.installAvailable() }, onAdd: store.openPicker, onQuit: onQuit)
                 .contextMenu {
                     Toggle("Launch at login", isOn: Binding(
                         get: { LaunchAtLogin.isEnabled },
@@ -95,6 +97,8 @@ struct WidgetView: View {
                     Button(HookInstaller.isInstalled() ? "Remove Allow / Deny hook…" : "Set up Allow / Deny buttons…") {
                         HookInstaller.confirmAndToggle()
                     }
+                    Button("Check for updates…") { updates?.checkNow() }
+                    Toggle("Check for updates automatically", isOn: $autoUpdates)
                     Button("Shortcuts & tips…") { store.openShortcuts() }
                     Button("Enable double-tap ⌘ shortcut…") { DoubleCommandTap.openAccessibilitySettings() }
                     Button("Quit", action: onQuit)
@@ -187,6 +191,8 @@ struct PressScaleStyle: ButtonStyle {
 struct HeaderView: View {
     let needsYouCount: Int
     @Binding var collapsed: Bool
+    let updateVersion: String?
+    let onUpdate: () -> Void
     let onAdd: () -> Void
     let onQuit: () -> Void
 
@@ -211,6 +217,10 @@ struct HeaderView: View {
                     .background(Capsule().fill(Color.red))
                     .fixedSize()
                     .layoutPriority(1)
+            }
+            if let updateVersion {
+                HeaderIconButton(symbol: "arrow.down.circle.fill", hoverColor: ReplyMetrics.accent, action: onUpdate)
+                    .help("Update to \(updateVersion)")
             }
             HeaderIconButton(symbol: "plus", action: onAdd).help("Add an existing session")
             HeaderIconButton(symbol: "xmark", hoverColor: .red, action: onQuit)

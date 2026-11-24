@@ -9,6 +9,7 @@ final class SessionStore: ObservableObject {
     @Published private(set) var sendStatus: String?
     @Published private(set) var pickerOpen = false
     @Published private(set) var shortcutsOpen = false
+    @Published private(set) var updateVersion: String?
 
     private let source: SessionSource
     private var decidedRequestIds = Set<String>()
@@ -69,6 +70,8 @@ final class SessionStore: ObservableObject {
         refresh()
         pickerOpen = true
     }
+
+    func setUpdate(_ version: String?) { updateVersion = version }
 
     func openShortcuts() { shortcutsOpen = true }
 

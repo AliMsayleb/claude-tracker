@@ -3,6 +3,36 @@ import AppKit
 let options = LaunchOptions(CommandLine.arguments)
 let source: SessionSource = options.useSample ? .sample : .live
 
+if let command = options.updateCommand {
+    switch command[0] {
+    case "--test-version-compare":
+        for (candidate, installed) in [("1.2.1", "1.2.0"), ("1.10.0", "1.9.9"), ("v2.0", "1.99"), ("1.2.0", "1.2.0"), ("1.1.9", "1.2.0"), ("1.2", "1.2.0")] {
+            Console.line("\(candidate) > \(installed): \(AppVersion.isNewer(candidate, than: installed))")
+        }
+    case "--check-update":
+        do {
+            let release = try UpdateService.fetchLatest()
+            Console.line(AppVersion.isNewer(release.version, than: AppVersion.current) ? "update available \(release.version)" : "up to date \(AppVersion.current)")
+        } catch {
+            Console.line("could not check: \(error.localizedDescription)")
+            exit(1)
+        }
+    case "--download-update":
+        guard command.count > 1 else { exit(1) }
+        do {
+            let app = try UpdateService.download(try UpdateService.fetchLatest(), into: URL(fileURLWithPath: command[1]))
+            Console.line("downloaded \(app.path)")
+        } catch {
+            Console.line("failed: \(error.localizedDescription)")
+            exit(1)
+        }
+    default:
+        guard command.count > 3, let pid = Int32(command[1]) else { exit(1) }
+        Console.line(UpdateService.script(waitingFor: pid, newApp: URL(fileURLWithPath: command[2]), destination: URL(fileURLWithPath: command[3])))
+    }
+    exit(0)
+}
+
 if let choice = options.answerOption {
     guard let request = PermissionRequests.load().first(where: { $0.id == choice.requestId }), request.questions.count == 1,
           request.questions[0].options.indices.contains(choice.index)

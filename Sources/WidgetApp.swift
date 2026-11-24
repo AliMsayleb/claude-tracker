@@ -78,6 +78,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var pickerResignObserver: NSObjectProtocol?
     private var lastFittedHeight: CGFloat = 0
     private let resizer = WidgetResizer()
+    private lazy var updates: UpdateController? = options.useSample ? nil : UpdateController(store: store)
     private var savedDefaults: [String: Any] = [:]
     private static let sandboxedKeys = ["replyPopupSize", "replyFontScale", "widgetMaxHeight", "collapsed", "openTarget"]
     private var isApplyingReplySize = false
@@ -93,7 +94,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         if options.useSample {
             for key in Self.sandboxedKeys { savedDefaults[key] = UserDefaults.standard.object(forKey: key) }
-            for key in ["replyPopupSize", "replyFontScale", "widgetMaxHeight"] { UserDefaults.standard.removeObject(forKey: key) }
+            for key in ["replyPopupSize", "replyFontScale", "widgetMaxHeight", "collapsed"] { UserDefaults.standard.removeObject(forKey: key) }
+            if options.startCollapsed { UserDefaults.standard.set(true, forKey: "collapsed") }
             UserDefaults.standard.set(900.0, forKey: Self.widgetMaxHeightKey)
         }
         if options.useSample { ClickModifiers.current = { [options] in options.commandClick ? .command : [] } }
@@ -103,7 +105,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let backgroundCursorEnabled = BackgroundCursor.enable()
         if options.testCursors { Console.line("background cursor enabled=\(backgroundCursorEnabled)") }
         if options.testWidgetSize { UserDefaults.standard.set(220.0, forKey: Self.widgetMaxHeightKey) }
-        hostingView = FittingHostingView(rootView: WidgetView(store: store, resizer: resizer, onQuit: { NSApp.terminate(nil) }))
+        hostingView = FittingHostingView(rootView: WidgetView(store: store, resizer: resizer, updates: updates, onQuit: { NSApp.terminate(nil) }))
         hostingView.onContentSizeChange = { [weak self] in self?.fitPanelToContent() }
 
         panel = FloatingPanel(
@@ -190,6 +192,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             UserDefaults.standard.set(true, forKey: "shownShortcutsIntro")
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in self?.store.openShortcuts() }
         }
+        updates?.startAutomaticChecks()
         if !options.useSample {
             doubleCommandTap = DoubleCommandTap { [weak self] in self?.toggleVisibility() }
             doubleCommandTap?.start(promptForPermission: true)

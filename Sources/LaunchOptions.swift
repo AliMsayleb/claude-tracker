@@ -18,6 +18,8 @@ struct LaunchOptions {
     let testMarkdown: Bool
     let testTyping: Bool
     let testResize: Bool
+    let startCollapsed: Bool
+    let updateCommand: [String]?
     let hookCommand: String?
     let previewRowHover: Bool
     let testTerminal: Bool
@@ -47,6 +49,9 @@ struct LaunchOptions {
         testMarkdown = arguments.contains("--test-markdown")
         testTyping = arguments.contains("--test-typing")
         testResize = arguments.contains("--test-resize")
+        startCollapsed = arguments.contains("--start-collapsed")
+        updateCommand = arguments.firstIndex { ["--check-update", "--download-update", "--print-update-script", "--test-version-compare"].contains($0) }
+            .map { Array(arguments[$0...]) }
         hookCommand = ["--install-hook", "--uninstall-hook", "--hook-status"].first { arguments.contains($0) }
         previewRowHover = arguments.contains("--preview-row-hover")
         testTerminal = arguments.contains("--test-terminal-script")

@@ -29,7 +29,7 @@ enum ShortcutCatalog {
             ShortcutItem(keys: ["⌄"], action: "Collapse the widget to its header, or expand it again"),
             ShortcutItem(keys: ["Drag header"], action: "Move the widget anywhere"),
             ShortcutItem(keys: ["Drag edge"], action: "Resize from the left, right or bottom edge (the size is remembered)"),
-            ShortcutItem(keys: ["Right-click header"], action: "Choose what ⌘-click opens, set up Allow / Deny, launch at login, enable the ⌘ shortcut, shortcuts, quit"),
+            ShortcutItem(keys: ["Right-click header"], action: "Choose what ⌘-click opens, set up Allow / Deny, check for updates, launch at login, enable the ⌘ shortcut, shortcuts, quit"),
         ]),
         ShortcutSection(title: "The reply popup", items: [
             ShortcutItem(keys: ["Return"], action: "Send your reply"),

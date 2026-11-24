@@ -31,16 +31,11 @@ check "plain click on the request text opens the popup only" "" "$(click 100 150
 
 work="$(mktemp -d)"
 domain="com.local.claude-widget"
-previous="$(defaults read "$domain" collapsed 2> /dev/null || echo unset)"
-restore() {
-  if [ "$previous" = "unset" ]; then defaults delete "$domain" collapsed 2> /dev/null; else defaults write "$domain" collapsed -bool "$([ "$previous" = 1 ] && echo true || echo false)"; fi
-  rm -rf "$work"
-}
+restore() { rm -rf "$work"; }
 trap restore EXIT
 
 pixel_height() { sips -g pixelHeight "$1" | awk '/pixelHeight/ {print $2}'; }
 
-defaults write "$domain" collapsed -bool false
 timeout 20 "$binary" --sample --click 100 272 --snapshot "$work/popup.png"
 check "plain click shows the popup window" "yes" "$([ -f "$work/popup.png-reply.png" ] && echo yes || echo no)"
 check "popup is larger than before (at least 600 points wide)" "yes" "$([ "$(sips -g pixelWidth "$work/popup.png-reply.png" | awk '/pixelWidth/ {print $2}')" -ge 1200 ] && echo yes || echo no)"
@@ -52,8 +47,7 @@ collapsed="$(pixel_height "$work/collapsed.png")"
 check "chevron collapses the list to the header" "yes" "$([ "$collapsed" -lt 100 ] && [ "$expanded" -gt 400 ] && echo yes || echo no)"
 cp "$work/collapsed.png" "$root/build/collapsed.png"
 
-defaults write "$domain" collapsed -bool true
-timeout 20 "$binary" --sample --click 24 22 --snapshot "$work/reopened.png"
+timeout 20 "$binary" --sample --start-collapsed --click 24 22 --snapshot "$work/reopened.png"
 check "chevron expands it again" "$expanded" "$(pixel_height "$work/reopened.png")"
 
 timeout 20 "$binary" --sample --click 296 22 --snapshot "$work/quit.png"

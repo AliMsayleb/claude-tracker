@@ -42,9 +42,9 @@ After installing:
 
 **Uninstall:** `scripts/uninstall.sh` (in the repo) removes the app, the hook and `~/.claude-widget`. Add `--purge-preferences` to also delete its saved settings. Without the repo: right-click the header > "Remove Allow / Deny hook…", then delete the app.
 
-**Update:** run the install command again. Your settings are kept.
+**Update:** right-click the widget header and choose **Check for updates…**. If a newer version exists it downloads it, checks the checksum, replaces the app and restarts it. A small download icon appears in the header when an update is available (the app checks once a day; turn that off with "Check for updates automatically" in the same menu). You can also run the install command again. Your settings are kept. After an update macOS may ask for the ⌘ shortcut permission (Accessibility) again, because the new app has a new signature.
 
-**Everything is local.** The widget reads Claude's local session files and talks only to your own sessions. It makes no network connections (only the installer downloads the app).
+**Everything is local.** The widget reads Claude's local session files and talks only to your own sessions. The only network connection it makes is the update check: one request a day to GitHub's public releases API (`api.github.com`), plus the download when you choose to update. Turn the daily check off in the right-click menu. Nothing about your sessions is ever sent.
 
 ### Publishing a download (maintainers)
 
@@ -87,7 +87,7 @@ Users can see this list inside the app: right-click the widget header and choose
 | ⌄ | Collapse the widget to its header, or expand it again |
 | Drag header | Move the widget anywhere |
 | Drag edge | Resize from the left, right or bottom edge (the size is remembered) |
-| Right-click header | Choose what ⌘-click opens, set up Allow / Deny, launch at login, enable the ⌘ shortcut, shortcuts, quit |
+| Right-click header | Choose what ⌘-click opens, set up Allow / Deny, check for updates, launch at login, enable the ⌘ shortcut, shortcuts, quit |
 
 ### The reply popup
 
@@ -210,13 +210,14 @@ tests/run_all.sh
 | `popup` | Popup size memory, staying open when focus is lost, text size, ⌘W |
 | `widget_window` | Search, widget height cap, the add-session window, and that test runs leave your preferences untouched |
 | `widget_resize` | The edge-resize maths, scripted drags of the left, right and bottom edges, and the resize cursor areas |
+| `updates` | Version comparison, finding a newer release, checksum refusal, missing/unreachable downloads, and replacing the app (against a fake release made of local files) |
 | `install_app`, `uninstall`, `terminal` | The source installer and uninstaller on temp folders, and the Terminal launch script (quoting, input checks) |
 
 Not covered by automated tests: real ⌘Tab and clipboard-manager behaviour, real mouse hover and dragging (the tests send scripted events), and replies into a Desktop session's own window. `tests/drive_claude.py` and `tests/e2e_send.py` drive a real Claude session end to end (they cost a few cents and are run by hand).
 
 ## Debug flags
 
-`--dump` (print rows as JSON), `--sample` (fake data; never touches your real sessions or preferences), `--gc` (one cleanup pass), `--decide <id> allow|deny`, `--send <pid> <text>`, `--detail <pid>`, `--time-detail <pid>`, `--snapshot <png>` (also writes `-reply.png` / `-picker.png` for open popups), `--click <x> <y>`, `--command-click <x> <y>`, and the `--preview-hover <sf-symbol-name>` (render a header button in its hover state), and the `--test-*` flags used by the test suites. In `--sample` mode the windows are parked off-screen, so test runs never appear on your display.
+`--dump` (print rows as JSON), `--sample` (fake data; never touches your real sessions or preferences), `--gc` (one cleanup pass), `--decide <id> allow|deny`, `--send <pid> <text>`, `--detail <pid>`, `--time-detail <pid>`, `--snapshot <png>` (also writes `-reply.png` / `-picker.png` for open popups), `--click <x> <y>`, `--command-click <x> <y>`, and the `--check-update`, `--download-update <dir>`, `--print-update-script <pid> <new app> <destination>` (the update steps, testable against a fake release with `CLAUDE_TRACKER_UPDATE_URL`), `--preview-hover <sf-symbol-name>` (render a header button in its hover state), and the `--test-*` flags used by the test suites. In `--sample` mode the windows are parked off-screen, so test runs never appear on your display.
 
 ## Project layout
 
