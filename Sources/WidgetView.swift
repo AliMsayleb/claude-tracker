@@ -106,6 +106,7 @@ struct WidgetView: View {
             }
         }
         .frame(minWidth: WidgetMetrics.minWidth, maxWidth: .infinity)
+        .frame(maxHeight: .infinity, alignment: .top)
         .background(.regularMaterial)
         .clipShape(RoundedRectangle(cornerRadius: WidgetMetrics.cornerRadius, style: .continuous))
         .overlay(
@@ -149,7 +150,7 @@ struct WidgetView: View {
                 )
             }
             .onPreferenceChange(ListHeightKey.self) { measuredListHeight = $0 }
-            .frame(height: listHeight)
+            .frame(minHeight: WidgetMetrics.rowHeight, idealHeight: listHeight, maxHeight: .infinity)
         }
     }
 }

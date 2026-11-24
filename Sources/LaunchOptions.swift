@@ -41,6 +41,8 @@ struct LaunchOptions {
     let testWidgetDrag: Bool
     let testSearch: Bool
     let testWidgetSize: Bool
+    let midDragHeight: Double?
+    let widgetCap: Double?
     let testPopup: Bool
     let testReturnKey: Bool
     let timeDetailPid: Int32?
@@ -92,6 +94,8 @@ struct LaunchOptions {
         testWidgetDrag = arguments.contains("--test-widget-drag")
         testSearch = arguments.contains("--test-search")
         testWidgetSize = arguments.contains("--test-widget-size")
+        widgetCap = Self.values(after: "--widget-cap", count: 1, in: arguments).flatMap { Double($0[0]) }
+        midDragHeight = Self.values(after: "--test-mid-drag", count: 1, in: arguments).flatMap { Double($0[0]) }
         testPopup = arguments.contains("--test-popup")
         testReturnKey = arguments.contains("--test-return-key")
         timeDetailPid = Self.values(after: "--time-detail", count: 1, in: arguments).flatMap { Int32($0[0]) }

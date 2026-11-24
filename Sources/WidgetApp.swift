@@ -104,6 +104,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private static let sandboxedKeys = ["replyPopupSize", "replyFontScale", "widgetMaxHeight", "collapsed", "openTarget", "newSessionTarget", "newSessionSize"]
     private static let newSessionSizeKey = "newSessionSize"
     private var isApplyingNewSessionSize = false
+    private var holdingFit = false
     private var newSessionResizeObserver: Any?
     private var isApplyingReplySize = false
     private var replyHostingView: NSHostingView<ReplyView>!
@@ -133,6 +134,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let backgroundCursorEnabled = BackgroundCursor.enable()
         if options.testCursors { Console.line("background cursor enabled=\(backgroundCursorEnabled)") }
         if options.testWidgetSize { UserDefaults.standard.set(220.0, forKey: Self.widgetMaxHeightKey) }
+        if let cap = options.widgetCap { UserDefaults.standard.set(cap, forKey: Self.widgetMaxHeightKey) }
         hostingView = FittingHostingView(rootView: WidgetView(store: store, resizer: resizer, updates: updates, onQuit: { NSApp.terminate(nil) }))
         hostingView.onContentSizeChange = { [weak self] in self?.fitPanelToContent() }
 
@@ -410,7 +412,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func fitPanelToContent() {
-        guard !resizer.isResizing else { return }
+        guard !resizer.isResizing, !holdingFit else { return }
         let height = hostingView.fittingSize.height
         let current = panel.frame
         lastFittedHeight = height
@@ -511,6 +513,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         if options.testCursors {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in self?.reportCursorAreas() }
+        }
+        if let height = options.midDragHeight {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                guard let self else { return }
+                self.holdingFit = true
+                let frame = self.panel.frame
+                self.panel.setFrame(NSRect(x: frame.minX, y: frame.maxY - height, width: frame.width, height: height), display: true)
+            }
         }
         if options.testWidgetSize {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
