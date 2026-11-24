@@ -9,20 +9,33 @@ work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 mkdir -p "$output"
 
+snap() {
+  expected="$1"; shift
+  for _ in 1 2 3; do
+    rm -f "$expected"
+    timeout 30 "$binary" --sample "$@" > /dev/null 2>&1 || true
+    [ -s "$expected" ] && return 0
+  done
+  echo "could not capture $expected" >&2
+  exit 1
+}
+
 compose() {
   swift scripts/compose-screenshot.swift "$1" "$output/$2.png"
   width="$(sips -g pixelWidth "$output/$2.png" | awk '/pixelWidth/ {print $2}')"
   [ "$width" -le 1200 ] || sips --resampleWidth 1200 "$output/$2.png" > /dev/null
 }
 
-timeout 30 "$binary" --sample --snapshot "$work/widget.png"
+snap "$work/widget.png" --snapshot "$work/widget.png"
 compose "$work/widget.png" widget
-timeout 30 "$binary" --sample --click 100 327 --snapshot "$work/popup.png"
+snap "$work/popup.png-reply.png" --click 100 505 --snapshot "$work/popup.png"
 compose "$work/popup.png-reply.png" popup
-timeout 30 "$binary" --sample --click 100 150 --snapshot "$work/permission.png"
+snap "$work/question.png-reply.png" --click 100 272 --snapshot "$work/question.png"
+compose "$work/question.png-reply.png" popup-question
+snap "$work/permission.png-reply.png" --click 100 150 --snapshot "$work/permission.png"
 compose "$work/permission.png-reply.png" popup-permission
-timeout 30 "$binary" --sample --click 264 22 --snapshot "$work/add.png"
+snap "$work/add.png-picker.png" --click 264 22 --snapshot "$work/add.png"
 compose "$work/add.png-picker.png" add-session
-timeout 30 "$binary" --sample --open-shortcuts --snapshot "$work/shortcuts.png"
+snap "$work/shortcuts.png-shortcuts.png" --open-shortcuts --snapshot "$work/shortcuts.png"
 compose "$work/shortcuts.png-shortcuts.png" shortcuts
 echo "screenshots written to $output"

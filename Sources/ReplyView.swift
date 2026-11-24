@@ -36,6 +36,7 @@ struct ReplyView: View {
     let onClose: () -> Void
 
     @State private var text = ""
+    @State private var picks: [String: Set<String>] = [:]
     @State private var appeared = false
     @State private var shownKey: String?
     @FocusState private var focused: Bool
@@ -75,6 +76,7 @@ struct ReplyView: View {
                     .padding(22)
             }
             if row.state == .needsPermission { permissionNotice(for: row) }
+            if let request = row.request, request.isQuestion { questionPanel(for: request) }
             composer(for: row)
         }
     }
@@ -138,13 +140,106 @@ struct ReplyView: View {
         .padding(.top, 8)
     }
 
+    private func questionPanel(for request: PermissionRequest) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                Label("Claude is asking you", systemImage: "questionmark.bubble.fill")
+                    .font(.system(size: 13 * zoom.scale, weight: .semibold))
+                    .foregroundStyle(StatusPalette.answer)
+                ForEach(Array(request.questions.enumerated()), id: \.offset) { _, question in
+                    VStack(alignment: .leading, spacing: 8) {
+                        if !question.header.isEmpty {
+                            Text(question.header.uppercased()).font(.system(size: 11 * zoom.scale, weight: .bold)).foregroundStyle(.secondary)
+                        }
+                        Text(question.question).font(.system(size: 15 * zoom.scale, weight: .semibold))
+                        ForEach(Array(question.options.enumerated()), id: \.offset) { _, option in
+                            optionRow(option, in: question, of: request)
+                        }
+                    }
+                }
+                if !request.canAnswerInline {
+                    Button("Submit answers") { submit(request) }
+                        .buttonStyle(ActionButtonStyle(color: StatusPalette.answer))
+                        .disabled(!allAnswered(request))
+                        .opacity(allAnswered(request) ? 1 : 0.4)
+                }
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(height: questionPanelHeight(for: request))
+        .layoutPriority(1)
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(StatusPalette.answer.opacity(0.1)))
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+    }
+
+    private func questionPanelHeight(for request: PermissionRequest) -> CGFloat {
+        let perQuestion = request.questions.map { 56 + CGFloat($0.options.count) * 66 }.reduce(0, +)
+        let submit: CGFloat = request.canAnswerInline ? 0 : 52
+        return min(76 + perQuestion + submit, 360) * zoom.scale
+    }
+
+    private func optionRow(_ option: AskOption, in question: AskQuestion, of request: PermissionRequest) -> some View {
+        let selected = picks[question.question]?.contains(option.label) == true
+        return Button {
+            if request.canAnswerInline {
+                store.answer(request, [question.question: option.label])
+            } else {
+                toggle(option.label, in: question)
+            }
+        } label: {
+            HStack(spacing: 10) {
+                if !request.canAnswerInline {
+                    Image(systemName: selected ? (question.multiSelect ? "checkmark.square.fill" : "largecircle.fill.circle") : (question.multiSelect ? "square" : "circle"))
+                        .foregroundStyle(selected ? StatusPalette.answer : Color.secondary)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(option.label).font(.system(size: 14 * zoom.scale, weight: .semibold))
+                    if !option.description.isEmpty {
+                        Text(option.description).font(.system(size: 12 * zoom.scale)).foregroundStyle(.secondary).multilineTextAlignment(.leading)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.primary.opacity(selected ? 0.16 : 0.08)))
+        }
+        .buttonStyle(PressScaleStyle())
+    }
+
+    private func toggle(_ label: String, in question: AskQuestion) {
+        var current = picks[question.question] ?? []
+        if question.multiSelect {
+            if current.contains(label) { current.remove(label) } else { current.insert(label) }
+        } else {
+            current = [label]
+        }
+        picks[question.question] = current
+    }
+
+    private func allAnswered(_ request: PermissionRequest) -> Bool {
+        request.questions.allSatisfy { !(picks[$0.question] ?? []).isEmpty }
+    }
+
+    private func submit(_ request: PermissionRequest) {
+        var answers: [String: String] = [:]
+        for question in request.questions {
+            let chosen = question.options.map(\.label).filter { picks[question.question]?.contains($0) == true }
+            answers[question.question] = chosen.joined(separator: ", ")
+        }
+        store.answer(request, answers)
+        picks = [:]
+    }
+
     private func composer(for row: SessionRow) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             if let status = store.sendStatus {
                 Text(status).font(.system(size: 13)).foregroundStyle(.red)
             }
             VStack(alignment: .leading, spacing: 10) {
-                TextField(row.state == .needsPermission ? "Add instructions (this does not approve the request)…" : "Reply to this session…", text: $text, axis: .vertical)
+                TextField(placeholder(for: row), text: $text, axis: .vertical)
                     .textFieldStyle(.plain)
                     .font(.system(size: 17 * zoom.scale))
                     .lineLimit(3...9)
@@ -183,11 +278,21 @@ struct ReplyView: View {
         editor?.insertText("\n", replacementRange: NSRange(location: NSNotFound, length: 0))
     }
 
+    private func placeholder(for row: SessionRow) -> String {
+        if let request = row.request, request.questions.count == 1 { return "Or type your own answer…" }
+        return row.state == .needsPermission ? "Add instructions (this does not approve the request)…" : "Reply to this session…"
+    }
+
     private var canSend: Bool { !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
     private func send(_ row: SessionRow) {
         let message = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !message.isEmpty else { return }
+        if let request = row.request, request.questions.count == 1 {
+            store.answer(request, [request.questions[0].question: message])
+            text = ""
+            return
+        }
         if store.send(message, to: row) { text = "" }
     }
 }

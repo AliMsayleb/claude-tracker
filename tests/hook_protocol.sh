@@ -58,9 +58,15 @@ out="$(printf '%s' "$payload" | CLAUDE_WIDGET_HOME="$home" "$hook")"
 check "stale heartbeat: silent" "" "$out"
 
 new_home
-out="$(printf '%s' '{"session_id":"s-1","tool_name":"AskUserQuestion","tool_input":{}}' | CLAUDE_WIDGET_HOME="$home" "$hook")"
-check "AskUserQuestion: ignored" "" "$out"
-check "AskUserQuestion: no request" "0" "$(ls "$home/requests" | wc -l | tr -d ' ')"
+ask='{"session_id":"s-1","tool_name":"AskUserQuestion","tool_input":{"questions":[]}}'
+answer_json='{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow","updatedInput":{"answers":{"Q":"A"}}}}}'
+printf '%s' "$ask" | CLAUDE_WIDGET_HOME="$home" "$hook" > "$home/out" &
+ask_pid=$!
+wait_for_request "$home"
+printf '%s' "$answer_json" > "$home/requests/$(request_id "$home").decision"
+wait "$ask_pid"
+check "AskUserQuestion: a full answer is passed through unchanged" "$answer_json" "$(cat "$home/out")"
+check "AskUserQuestion: request cleaned up" "0" "$(ls "$home/requests" | wc -l | tr -d ' ')"
 
 new_home
 out="$(printf '%s' '{"session_id":"s-1","tool_name": "ExitPlanMode","tool_input":{}}' | CLAUDE_WIDGET_HOME="$home" "$hook")"

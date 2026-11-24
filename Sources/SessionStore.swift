@@ -109,6 +109,12 @@ final class SessionStore: ObservableObject {
         refresh()
     }
 
+    func answer(_ request: PermissionRequest, _ answers: [String: String]) {
+        decidedRequestIds.insert(request.id)
+        source.answer(request, answers)
+        refresh()
+    }
+
     func decide(_ request: PermissionRequest, _ decision: PermissionDecision) {
         decidedRequestIds.insert(request.id)
         source.decide(request, decision)

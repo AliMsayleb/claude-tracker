@@ -7,6 +7,7 @@ struct SessionSource {
     let jump: (SessionRow) -> Void
     let openTerminal: (SessionRow) -> Void
     let decide: (PermissionRequest, PermissionDecision) -> Void
+    let answer: (PermissionRequest, [String: String]) -> Void
     let remove: (SessionRow) -> Void
     let add: (DesktopSession) -> Void
     let candidates: () -> [DesktopSession]
@@ -24,6 +25,7 @@ extension SessionSource {
         jump: SessionJumper.jump,
         openTerminal: SessionJumper.openInTerminal,
         decide: PermissionRequests.decide,
+        answer: PermissionRequests.answer,
         remove: LiveSessions.remove,
         add: LiveSessions.add,
         candidates: LiveSessions.candidates,
@@ -40,6 +42,7 @@ extension SessionSource {
         jump: { Console.line("jump pid=\($0.pid)") },
         openTerminal: { Console.line("terminal pid=\($0.pid)") },
         decide: { Console.line("decide \($0.id) \($1.rawValue)") },
+        answer: { Console.line("answer \($0.id) \($1.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }.joined(separator: ";"))") },
         remove: { Console.line("remove pid=\($0.pid)") },
         add: { Console.line("add \($0.id)") },
         candidates: {
@@ -120,6 +123,17 @@ enum LiveSessions {
 enum SampleData {
     static var rows: [SessionRow] {
         let now = Date()
+        let question = PermissionRequest(
+            id: "sample-question", sessionId: "sample-2", toolName: "AskUserQuestion", detail: "", createdAt: now - 420,
+            questions: [AskQuestion(
+                question: "Which environment should I deploy to?", header: "Deploy", multiSelect: false,
+                options: [
+                    AskOption(label: "Staging", description: "Safe to test first"),
+                    AskOption(label: "Production", description: "Goes live to users"),
+                    AskOption(label: "Cancel", description: "Do not deploy"),
+                ]
+            )]
+        )
         let command = PermissionRequest(
             id: "sample-request",
             sessionId: "sample-1",
@@ -129,7 +143,7 @@ enum SampleData {
         )
         let samples = [
             sample(1, "Fix reconciliation report", "backend", .needsPermission, now - 140, [command]),
-            sample(2, "Review payments PR", "mobile-app", .needsInput, now - 420),
+            sample(2, "Review payments PR", "mobile-app", .needsInput, now - 420, [question]),
             sample(3, "Migrate trade updates", "backend", .working, now - 30, agents: AgentProgress(done: 4, total: 6)),
             sample(4, "Claude Code sessions floating widget", "No folder", .working, now - 5),
             sample(5, "Refactor onboarding screens", "mobile-app", .unread, now - 1500,

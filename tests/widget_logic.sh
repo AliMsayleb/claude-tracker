@@ -63,6 +63,8 @@ write_request req-current sess-a Bash "rm -rf build" 10
 write_request req-busy-session sess-c Bash "echo busy" 20
 write_request req-fresh-busy sess-c Bash "echo fresh" 1
 write_request req-unknown-session sess-x Bash "echo unknown" 20
+jq -n '{session_id: "sess-b", tool_name: "AskUserQuestion", tool_input: {questions: [{question: "Which color?", header: "Color", multiSelect: false, options: [{label: "Red", description: "warm"}, {label: "Blue", description: "cool"}]}]}}' > "$home/requests/req-question.json"
+touch -t "$(date -v-10S +%Y%m%d%H%M.%S)" "$home/requests/req-question.json"
 
 jq -n '{sessionId: "local_sess-f", title: "x", cwd: "/w", isArchived: false, lastActivityAt: 5, lastFocusedAt: 1000, lastTurnEdgeAt: 2000, postTurnSummary: {status_detail: "Finished the refactor", needs_action: ""}}' > "$desktop/local_sess-f.json"
 jq -n '{sessionId: "local_sess-b", title: "x", cwd: "/w", isArchived: false, lastActivityAt: 5, lastFocusedAt: 1000, lastTurnEdgeAt: 2000, postTurnSummary: {status_detail: "old", needs_action: "Do you want a reply?"}}' > "$desktop/local_sess-b.json"
@@ -151,11 +153,19 @@ rm -rf "$sockdir"
 
 "$binary" --gc
 remaining="$(ls "$home/requests" | sed 's/\.json$//' | sort | tr '\n' ',')"
-check "gc keeps current and fresh requests only" "req-current,req-fresh-busy," "$remaining"
+check "gc keeps current requests, fresh ones and a pending question" "req-current,req-fresh-busy,req-question," "$remaining"
 check "heartbeat written by gc" "yes" "$([ -f "$home/heartbeat" ] && echo yes || echo no)"
 
 check "after gc the permission row has one request" "req-current" \
   "$(dump | jq -r '.[0].requests | map(.id) | join(",")')"
+
+check "a question attaches to the session that is waiting for an answer" "Which color?|Red,Blue" \
+  "$(dump | jq -r '[.[] | select(.title == "Needs answer session")][0].requests[0].questions[0] | "\(.question)|\([.options[].label] | join(","))"')"
+"$binary" --answer req-question 1 > /dev/null
+check "answering writes a hook response with the chosen option and the original questions" \
+  "allow|Blue|Which color?" \
+  "$(jq -r '.hookSpecificOutput.decision | "\(.behavior)|\(.updatedInput.answers["Which color?"])|\(.updatedInput.questions[0].question)"' "$home/requests/req-question.decision")"
+check "answering a missing option fails" "1" "$("$binary" --answer req-question 9 > /dev/null; echo $?)"
 
 "$binary" --decide req-current allow
 check "decide allow writes decision file" "allow" "$(cat "$home/requests/req-current.decision")"

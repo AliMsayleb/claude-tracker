@@ -15,8 +15,10 @@ Claude Code sessions pile up fast, and it is easy to miss the one waiting for yo
 
 | | |
 |---|---|
-| **Needs permission:** allow or deny right in the widget, or in the popup | **Sub-agent counter:** the `4/6` chip shows finished out of started |
-| <img src="docs/screenshots/popup-permission.png" alt="Permission request in the popup" width="480"> | <img src="docs/screenshots/widget.png" alt="Widget with the sub-agent counter" width="240"> |
+| **Needs permission:** allow or deny right in the widget, or in the popup | **Questions from Claude:** answer multiple-choice questions with one click, or type your own answer |
+| <img src="docs/screenshots/popup-permission.png" alt="Permission request in the popup" width="480"> | <img src="docs/screenshots/popup-question.png" alt="A multiple-choice question in the popup" width="480"> |
+| **Sub-agent counter:** the `4/6` chip shows finished out of started | |
+| <img src="docs/screenshots/widget.png" alt="Widget with the sub-agent counter and a question" width="240"> | |
 | **Add a session:** search your existing Desktop sessions | **Shortcuts & tips:** built in, opens on first launch |
 | <img src="docs/screenshots/add-session.png" alt="The add-session search window" width="480"> | <img src="docs/screenshots/shortcuts.png" alt="The shortcuts window" width="480"> |
 
@@ -48,7 +50,7 @@ After installing:
 
 ```bash
 scripts/package.sh                       # builds dist/Claude-Tracker.zip (+ .sha256), universal: Apple Silicon and Intel
-gh release create v1.1.0 dist/Claude-Tracker.zip dist/Claude-Tracker.zip.sha256 --title "Claude Tracker 1.1.0" --notes "..."
+gh release create v<version> dist/Claude-Tracker.zip dist/Claude-Tracker.zip.sha256 --title "Claude Tracker <version>" --notes "..."
 ```
 
 `install.sh` downloads `releases/latest/download/Claude-Tracker.zip`, so the asset names must stay the same. A zip built this way is only ad-hoc signed; the installer avoids the macOS block because `curl` downloads are not quarantined. For a smooth browser download you need an Apple Developer ID:
@@ -79,6 +81,7 @@ Users can see this list inside the app: right-click the widget header and choose
 | ⌘ Click | Open the session in your default app, Claude Desktop or Terminal (choose in the right-click menu; also marks it read) |
 | ✓ on a row | Hover an unread row and click ✓ to mark it read |
 | Allow Deny | Answer a permission request right in the widget |
+| Option buttons | Answer a multiple-choice question from Claude right in the row (multi-select and several questions open in the popup) |
 | + | Add an existing Desktop session (type to search) |
 | ✕ on a row | Hover a row and click ✕ to remove it from the widget |
 | ⌄ | Collapse the widget to its header, or expand it again |
@@ -92,6 +95,7 @@ Users can see this list inside the app: right-click the widget header and choose
 |---|---|
 | Return | Send your reply |
 | Shift Return | New line |
+| Type Return | When Claude asks one question, your typed text is sent as your own answer |
 | Esc | Close the popup |
 | ⌘ W | Close the popup |
 | ⌘ + | Bigger text (⌘ = works too) |
@@ -146,9 +150,9 @@ Build and install from a clone (needs Xcode) with `scripts/install-app.sh`. For 
 - "Open in Desktop" and "Open in Terminal" in the popup header continue the session in either app.
 - If the session is waiting for permission, the popup shows the request with **Allow / Deny** (when the hook is set up) and warns that a typed reply cannot approve it. Claude Code deliberately ignores approvals that arrive as messages.
 
-## Allow / Deny buttons
+## Allow / Deny and questions
 
-They work through one `PermissionRequest` hook in `~/.claude/settings.json`. Add it from the app (right-click the header > "Set up Allow / Deny buttons…") or from a clone:
+They work through one `PermissionRequest` hook in `~/.claude/settings.json`. The same hook lets you answer Claude's multiple-choice questions (`AskUserQuestion`) from the widget: single-choice questions get one-click option buttons in the row, and multi-select or multi-question ones open in the popup with a Submit button. When Claude asks one question, text you type in the popup is sent as your own ("Other") answer. Plan approvals (`ExitPlanMode`) still have to be answered in Claude. Add it from the app (right-click the header > "Set up Allow / Deny buttons…") or from a clone:
 
 ```bash
 scripts/install-hook.sh --dry-run   # show the change, write nothing (needs jq)
@@ -163,9 +167,11 @@ The hook never blocks Claude:
 - If you answer in the normal dialog first, that works too. The hook is then cleaned up.
 - It waits up to 10 minutes for a widget decision. After that the buttons disappear and only the normal dialog remains.
 - Non-interactive runs (`claude -p`) wait about 5 seconds before their usual denial.
-- It ignores `AskUserQuestion` and `ExitPlanMode`, which the widget cannot answer.
+- It ignores `ExitPlanMode` (plan approval), which the widget cannot answer.
 
 If you work mostly in auto mode, you will rarely see permission rows. The "Needs your answer" and "New reply" rows are the ones you will use most.
+
+The question answering was verified with a real Claude session in a terminal (Claude received the answer chosen from the widget). It has not been verified with a Claude Desktop session.
 
 ## How it works
 

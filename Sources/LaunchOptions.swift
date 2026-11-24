@@ -32,6 +32,7 @@ struct LaunchOptions {
     let timeDetailPid: Int32?
     let detailPid: Int32?
     let send: (pid: Int32, text: String)?
+    let answerOption: (requestId: String, index: Int)?
     let decision: Decision?
 
     init(_ arguments: [String]) {
@@ -58,6 +59,7 @@ struct LaunchOptions {
         testPopup = arguments.contains("--test-popup")
         testReturnKey = arguments.contains("--test-return-key")
         timeDetailPid = Self.values(after: "--time-detail", count: 1, in: arguments).flatMap { Int32($0[0]) }
+        answerOption = Self.values(after: "--answer", count: 2, in: arguments).flatMap { values in Int(values[1]).map { (values[0], $0) } }
         send = Self.values(after: "--send", count: 2, in: arguments).flatMap { values in Int32(values[0]).map { ($0, values[1]) } }
         detailPid = Self.values(after: "--detail", count: 1, in: arguments).flatMap { Int32($0[0]) }
         clickPoint = Self.values(after: arguments.contains("--command-click") ? "--command-click" : "--click", count: 2, in: arguments)

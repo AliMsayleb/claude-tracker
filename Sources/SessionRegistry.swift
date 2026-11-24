@@ -97,7 +97,7 @@ enum SessionRegistry {
             since: record.statusUpdatedAt.map { Date(timeIntervalSince1970: $0 / 1000) },
             origin: record.entrypoint == "claude-desktop" ? .desktop : .terminal,
             hostSessionId: record.hostSessionId,
-            requests: state == .needsPermission ? requests : [],
+            requests: state.needsYou ? requests : [],
             summary: summary(for: state, desktop: desktop),
             cwd: record.cwd
         )

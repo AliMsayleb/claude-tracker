@@ -128,7 +128,8 @@ struct WidgetView: View {
                 VStack(spacing: 0) {
                     ForEach(store.rows) { row in
                         SessionRowView(
-                            row: row, onDecide: store.decide, onRemove: { store.remove(row) }, onMarkRead: { store.markRead(row) }
+                            row: row, onDecide: store.decide, onAnswer: store.answer, onRemove: { store.remove(row) },
+                            onMarkRead: { store.markRead(row) }, onOpenPopup: { store.openReply(row) }
                         )
                         .onTapGesture {
                             if ClickModifiers.current().contains(.command) { store.openPreferred(row) } else { store.openReply(row) }
@@ -225,8 +226,10 @@ struct HeaderView: View {
 struct SessionRowView: View {
     let row: SessionRow
     let onDecide: (PermissionRequest, PermissionDecision) -> Void
+    let onAnswer: (PermissionRequest, [String: String]) -> Void
     let onRemove: () -> Void
     let onMarkRead: () -> Void
+    let onOpenPopup: () -> Void
 
     @State private var pointerInside = false
 
@@ -237,8 +240,14 @@ struct SessionRowView: View {
         VStack(alignment: .leading, spacing: 0) {
             summary.frame(height: WidgetMetrics.rowHeight)
             if let request = row.request {
-                RequestCard(request: request, moreCount: row.requests.count - 1) { decision in
-                    onDecide(request, decision)
+                Group {
+                    if request.isQuestion {
+                        QuestionCard(request: request, onAnswer: { onAnswer(request, $0) }, onOpen: onOpenPopup)
+                    } else {
+                        RequestCard(request: request, moreCount: row.requests.count - 1) { decision in
+                            onDecide(request, decision)
+                        }
+                    }
                 }
                 .padding(.horizontal, WidgetMetrics.sidePadding)
                 .padding(.bottom, 14)
@@ -436,5 +445,65 @@ struct AgentChip: View {
         .background(Capsule().fill(color.opacity(0.18)))
         .fixedSize()
         .help("\(progress.done) of \(progress.total) sub-agents finished in this turn")
+    }
+}
+
+struct OptionButton: View {
+    let label: String
+    let description: String
+    let action: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack {
+                Text(label).font(.system(size: 13, weight: .semibold)).lineLimit(1)
+                Spacer(minLength: 0)
+                Image(systemName: "arrow.right").font(.system(size: 10, weight: .bold)).opacity(hovering ? 1 : 0)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.primary.opacity(hovering ? 0.18 : 0.09)))
+        }
+        .buttonStyle(PressScaleStyle())
+        .help(description)
+        .onHover { hovering = $0 }
+    }
+}
+
+struct QuestionCard: View {
+    let request: PermissionRequest
+    let onAnswer: ([String: String]) -> Void
+    let onOpen: () -> Void
+
+    var body: some View {
+        let first = request.questions[0]
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                if !first.header.isEmpty {
+                    Text(first.header)
+                        .font(.system(size: 11, weight: .bold))
+                        .padding(.horizontal, 9).padding(.vertical, 3)
+                        .background(Capsule().fill(StatusPalette.answer.opacity(0.22)))
+                }
+                if request.questions.count > 1 {
+                    Text("+\(request.questions.count - 1) more questions").font(.system(size: 11)).foregroundStyle(.secondary)
+                }
+            }
+            Text(first.question).font(.system(size: 13, weight: .semibold)).lineLimit(3)
+            if request.canAnswerInline {
+                VStack(spacing: 6) {
+                    ForEach(Array(first.options.enumerated()), id: \.offset) { _, option in
+                        OptionButton(label: option.label, description: option.description) {
+                            onAnswer([first.question: option.label])
+                        }
+                    }
+                }
+            } else {
+                Button("Answer…", action: onOpen).buttonStyle(ActionButtonStyle(color: StatusPalette.answer))
+            }
+        }
     }
 }

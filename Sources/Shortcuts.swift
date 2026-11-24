@@ -23,6 +23,7 @@ enum ShortcutCatalog {
             ShortcutItem(keys: ["⌘", "Click"], action: "Open the session in your default app, Claude Desktop or Terminal (choose in the right-click menu; also marks it read)"),
             ShortcutItem(keys: ["✓ on a row"], action: "Hover an unread row and click ✓ to mark it read"),
             ShortcutItem(keys: ["Allow", "Deny"], action: "Answer a permission request right in the widget"),
+            ShortcutItem(keys: ["Option buttons"], action: "Answer a multiple-choice question from Claude right in the row (multi-select and several questions open in the popup)"),
             ShortcutItem(keys: ["+"], action: "Add an existing Desktop session (type to search)"),
             ShortcutItem(keys: ["✕ on a row"], action: "Hover a row and click ✕ to remove it from the widget"),
             ShortcutItem(keys: ["⌄"], action: "Collapse the widget to its header, or expand it again"),
@@ -33,6 +34,7 @@ enum ShortcutCatalog {
         ShortcutSection(title: "The reply popup", items: [
             ShortcutItem(keys: ["Return"], action: "Send your reply"),
             ShortcutItem(keys: ["Shift", "Return"], action: "New line"),
+            ShortcutItem(keys: ["Type", "Return"], action: "When Claude asks one question, your typed text is sent as your own answer"),
             ShortcutItem(keys: ["Esc"], action: "Close the popup"),
             ShortcutItem(keys: ["⌘", "W"], action: "Close the popup"),
             ShortcutItem(keys: ["⌘", "+"], action: "Bigger text (⌘ = works too)"),

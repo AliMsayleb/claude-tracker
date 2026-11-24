@@ -3,6 +3,19 @@ import AppKit
 let options = LaunchOptions(CommandLine.arguments)
 let source: SessionSource = options.useSample ? .sample : .live
 
+if let choice = options.answerOption {
+    guard let request = PermissionRequests.load().first(where: { $0.id == choice.requestId }), request.questions.count == 1,
+          request.questions[0].options.indices.contains(choice.index)
+    else {
+        Console.line("no such question or option")
+        exit(1)
+    }
+    let question = request.questions[0]
+    PermissionRequests.answer(request, answers: [question.question: question.options[choice.index].label])
+    Console.line("answered \(question.options[choice.index].label)")
+    exit(0)
+}
+
 if let command = options.decision {
     guard let request = PermissionRequests.load().first(where: { $0.id == command.requestId }) else {
         Console.line("no such request: \(command.requestId)")

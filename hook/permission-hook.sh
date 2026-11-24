@@ -12,7 +12,7 @@ widget_is_running || exit 0
 
 payload="$(cat)"
 
-if printf '%s' "$payload" | grep -Eq '"tool_name" *: *"(AskUserQuestion|ExitPlanMode)"'; then
+if printf '%s' "$payload" | grep -Eq '"tool_name" *: *"ExitPlanMode"'; then
   exit 0
 fi
 
@@ -27,7 +27,12 @@ printf '%s' "$payload" > "$request.tmp" && mv "$request.tmp" "$request"
 deadline=$((SECONDS + max_wait))
 while [ "$SECONDS" -lt "$deadline" ]; do
   if [ -f "$decision" ]; then
-    case "$(cat "$decision")" in
+    answer="$(cat "$decision")"
+    case "$answer" in
+      "{"*)
+        printf '%s' "$answer"
+        exit 0
+        ;;
       allow)
         printf '%s' '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}'
         exit 0

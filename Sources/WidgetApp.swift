@@ -94,6 +94,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if options.useSample {
             for key in Self.sandboxedKeys { savedDefaults[key] = UserDefaults.standard.object(forKey: key) }
             for key in ["replyPopupSize", "replyFontScale", "widgetMaxHeight"] { UserDefaults.standard.removeObject(forKey: key) }
+            UserDefaults.standard.set(900.0, forKey: Self.widgetMaxHeightKey)
         }
         if options.useSample { ClickModifiers.current = { [options] in options.commandClick ? .command : [] } }
         HoverPreview.symbol = options.previewHover

@@ -1,11 +1,27 @@
 import Foundation
 
+struct AskOption: Equatable, Codable {
+    let label: String
+    let description: String
+}
+
+struct AskQuestion: Equatable, Codable {
+    let question: String
+    let header: String
+    let multiSelect: Bool
+    let options: [AskOption]
+}
+
 struct PermissionRequest: Identifiable, Equatable, Codable {
     let id: String
     let sessionId: String
     let toolName: String
     let detail: String
     let createdAt: Date
+    var questions: [AskQuestion] = []
+
+    var isQuestion: Bool { !questions.isEmpty }
+    var canAnswerInline: Bool { questions.count == 1 && !questions[0].multiSelect && questions[0].options.count <= 4 }
 }
 
 enum PermissionDecision: String {
@@ -31,6 +47,23 @@ enum PermissionRequests {
     static func decide(_ request: PermissionRequest, _ decision: PermissionDecision) {
         let target = WidgetPaths.requests.appendingPathComponent("\(request.id).decision")
         try? Data(decision.rawValue.utf8).write(to: target, options: .atomic)
+    }
+
+    static func answer(_ request: PermissionRequest, answers: [String: String]) {
+        let file = WidgetPaths.requests.appendingPathComponent("\(request.id).json")
+        guard let data = try? Data(contentsOf: file),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              var input = object["tool_input"] as? [String: Any]
+        else { return }
+        input["answers"] = answers
+        let response: [String: Any] = [
+            "hookSpecificOutput": [
+                "hookEventName": "PermissionRequest",
+                "decision": ["behavior": "allow", "updatedInput": input],
+            ],
+        ]
+        guard let output = try? JSONSerialization.data(withJSONObject: response, options: [.sortedKeys]) else { return }
+        try? output.write(to: WidgetPaths.requests.appendingPathComponent("\(request.id).decision"), options: .atomic)
     }
 
     static func discardStale(_ requests: [PermissionRequest], sessions: [SessionRecord], now: Date = Date()) {
@@ -67,7 +100,7 @@ enum PermissionRequests {
         let age = now.timeIntervalSince(request.createdAt)
         if age > staleAfter { return true }
         if age <= settleTime { return false }
-        guard let session, SessionRegistry.state(of: session) == .needsPermission else { return true }
+        guard let session, SessionRegistry.state(of: session).needsYou else { return true }
         guard let waitingSince = session.statusUpdatedAt.map({ Date(timeIntervalSince1970: $0 / 1000) }) else { return false }
         return request.createdAt < waitingSince.addingTimeInterval(-waitingStartTolerance)
     }
@@ -94,8 +127,21 @@ enum PermissionRequests {
             sessionId: sessionId,
             toolName: toolName,
             detail: detail(from: object["tool_input"] as? [String: Any]),
-            createdAt: modified ?? Date()
+            createdAt: modified ?? Date(),
+            questions: toolName == "AskUserQuestion" ? questions(from: object["tool_input"] as? [String: Any]) : []
         )
+    }
+
+    private static func questions(from input: [String: Any]?) -> [AskQuestion] {
+        let items = (input?["questions"] as? [[String: Any]]) ?? []
+        return items.compactMap { item in
+            guard let question = item["question"] as? String else { return nil }
+            let options = ((item["options"] as? [[String: Any]]) ?? []).compactMap { option -> AskOption? in
+                guard let label = option["label"] as? String else { return nil }
+                return AskOption(label: label, description: option["description"] as? String ?? "")
+            }
+            return AskQuestion(question: question, header: item["header"] as? String ?? "", multiSelect: item["multiSelect"] as? Bool ?? false, options: options)
+        }
     }
 
     private static func detail(from input: [String: Any]?) -> String {
