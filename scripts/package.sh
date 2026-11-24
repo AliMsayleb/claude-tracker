@@ -18,6 +18,8 @@ if [ -n "${NOTARY_PROFILE:-}" ]; then
 fi
 
 ditto -c -k --keepParent "build/package/Claude Tracker.app" "$archive"
+cp "$archive" dist/Claude-Tracker.zip
+(cd dist && shasum -a 256 Claude-Tracker.zip > Claude-Tracker.zip.sha256)
 touch dist/.metadata_never_index
 rm -rf build/package
 echo "packaged $archive"
