@@ -34,8 +34,10 @@ snap "$work/question.png-reply.png" --click 100 272 --snapshot "$work/question.p
 compose "$work/question.png-reply.png" popup-question
 snap "$work/permission.png-reply.png" --click 100 150 --snapshot "$work/permission.png"
 compose "$work/permission.png-reply.png" popup-permission
-snap "$work/add.png-picker.png" --click 264 22 --snapshot "$work/add.png"
+snap "$work/add.png-picker.png" --click 232 22 --snapshot "$work/add.png"
 compose "$work/add.png-picker.png" add-session
+snap "$work/newsession.png-newsession.png" --open-new-session --draft-new-session "$HOME/Documents" "Add dark mode to the settings screen, then run the tests and fix anything that breaks." --snapshot "$work/newsession.png"
+compose "$work/newsession.png-newsession.png" new-session
 snap "$work/shortcuts.png-shortcuts.png" --open-shortcuts --snapshot "$work/shortcuts.png"
 compose "$work/shortcuts.png-shortcuts.png" shortcuts
 echo "screenshots written to $output"

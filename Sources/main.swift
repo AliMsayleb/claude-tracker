@@ -1,7 +1,64 @@
 import AppKit
 
 let options = LaunchOptions(CommandLine.arguments)
+if let command = options.adoptCommand {
+    let known = Set(command[3].split(separator: ",").map(String.init))
+    let data = FileManager.default.contents(atPath: command[0]) ?? Data()
+    Console.line(NewSessionLauncher.newSessionId(in: data, excluding: known, name: command[1], folder: command[2]) ?? "none")
+    exit(0)
+}
+if let command = options.idleCommand {
+    let data = FileManager.default.contents(atPath: command[0]) ?? Data()
+    Console.line(NewSessionLauncher.isIdle(in: data, sessionId: command[1]) ? "idle" : "not idle")
+    exit(0)
+}
+if let command = options.popupScreenCommand {
+    func rect(_ text: String) -> NSRect {
+        let v = text.split(separator: ",").compactMap { Double($0) }
+        return v.count == 4 ? NSRect(x: v[0], y: v[1], width: v[2], height: v[3]) : .zero
+    }
+    let screens = command[1].split(separator: ";").map { rect(String($0)) }
+    Console.line(PopupScreen.index(widget: rect(command[0]), screens: screens).map(String.init) ?? "none")
+    exit(0)
+}
+if options.printHotKey {
+    Console.line("\(NewSessionHotKey.label) keyCode=\(NewSessionHotKey.keyCode) modifiers=\(NewSessionHotKey.modifiers)")
+    exit(0)
+}
+if let id = options.resumeURLId {
+    Console.line(NewSessionLauncher.resumeURL(sessionId: id)?.absoluteString ?? "nil")
+    exit(0)
+}
 let source: SessionSource = options.useSample ? .sample : .live
+
+if let command = options.newSessionCommand {
+    let request = NewSessionRequest(folder: command.folder == "none" ? nil : command.folder, prompt: command.prompt, target: command.target)
+    do { try NewSessionLauncher.validate(request) } catch {
+        Console.line("error: \(error.localizedDescription)")
+        exit(1)
+    }
+    if command.action == "--print-new-session" {
+        switch request.target {
+        case .desktop: Console.line(NewSessionLauncher.desktopURL(for: request)?.absoluteString ?? "nil")
+        case .terminal: Console.line(NewSessionLauncher.terminalScript(for: request))
+        case .background, .backgroundDesktop: Console.line(NewSessionLauncher.backgroundScript(for: request))
+        }
+        exit(0)
+    }
+    var finished = false
+    var failed = false
+    NewSessionLauncher.start(request) { result in
+        switch result {
+        case .success(let text): Console.line(text)
+        case .failure(let error):
+            Console.line("error: \(error.localizedDescription)")
+            failed = true
+        }
+        finished = true
+    }
+    while !finished { RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.1)) }
+    exit(failed ? 1 : 0)
+}
 
 if let command = options.updateCommand {
     switch command[0] {

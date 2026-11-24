@@ -93,27 +93,15 @@ struct ReplyView: View {
             Button { store.open(row) } label: {
                 Label("Open in Desktop", systemImage: "arrow.up.forward.app").font(.system(size: 13, weight: .medium))
             }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 12).padding(.vertical, 7)
-            .background(Capsule().fill(Color.primary.opacity(0.1)))
+            .buttonStyle(PillButtonStyle())
             Button { store.openTerminal(row) } label: {
                 Label("Open in Terminal", systemImage: "terminal").font(.system(size: 13, weight: .medium))
             }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 12).padding(.vertical, 7)
-            .background(Capsule().fill(Color.primary.opacity(0.1)))
-            Button { store.openShortcuts() } label: {
-                Image(systemName: "questionmark").font(.system(size: 12, weight: .bold)).frame(width: 28, height: 28)
-                    .background(Circle().fill(Color.primary.opacity(0.1)))
-            }
-            .buttonStyle(.plain)
-            .help("Shortcuts & tips (⌘/)")
-            Button(action: onClose) {
-                Image(systemName: "xmark").font(.system(size: 12, weight: .bold)).frame(width: 28, height: 28)
-                    .background(Circle().fill(Color.primary.opacity(0.1)))
-            }
-            .buttonStyle(.plain)
-            .keyboardShortcut(.cancelAction)
+            .buttonStyle(PillButtonStyle())
+            CircleIconButton(symbol: "questionmark", size: 28) { store.openShortcuts() }
+                .help("Shortcuts & tips (⌘/)")
+            CircleIconButton(symbol: "xmark", size: 28, action: onClose)
+                .keyboardShortcut(.cancelAction)
         }
         .padding(.horizontal, 22)
         .padding(.vertical, 16)
@@ -205,8 +193,9 @@ struct ReplyView: View {
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.primary.opacity(selected ? 0.16 : 0.08)))
+            .hoverHighlight(cornerRadius: 10, opacity: 0.08)
         }
-        .buttonStyle(PressScaleStyle())
+        .buttonStyle(PressScaleStyle(lifts: false))
     }
 
     private func toggle(_ label: String, in question: AskQuestion) {
@@ -262,7 +251,7 @@ struct ReplyView: View {
                             .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(ReplyMetrics.accent))
                             .opacity(canSend ? 1 : 0.4)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PressScaleStyle())
                     .disabled(!canSend)
                 }
             }

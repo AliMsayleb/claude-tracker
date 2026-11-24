@@ -1,10 +1,6 @@
 import AppKit
 import SwiftUI
 
-enum HoverPreview {
-    static var symbol: String?
-}
-
 enum RowHoverPreview {
     static var enabled = false
 }
@@ -83,7 +79,7 @@ struct WidgetView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HeaderView(needsYouCount: needsYouCount, collapsed: $collapsed, updateVersion: store.updateVersion, onUpdate: { updates?.installAvailable() }, onAdd: store.openPicker, onQuit: onQuit)
+            HeaderView(needsYouCount: needsYouCount, collapsed: $collapsed, updateVersion: store.updateVersion, onUpdate: { updates?.installAvailable() }, onSearch: store.openPicker, onNewSession: store.openNewSession, onQuit: onQuit)
                 .contextMenu {
                     Toggle("Launch at login", isOn: Binding(
                         get: { LaunchAtLogin.isEnabled },
@@ -97,6 +93,7 @@ struct WidgetView: View {
                     Button(HookInstaller.isInstalled() ? "Remove Allow / Deny hook…" : "Set up Allow / Deny buttons…") {
                         HookInstaller.confirmAndToggle()
                     }
+                    Button("New session…") { store.openNewSession() }
                     Button("Check for updates…") { updates?.checkNow() }
                     Toggle("Check for updates automatically", isOn: $autoUpdates)
                     Button("Shortcuts & tips…") { store.openShortcuts() }
@@ -132,8 +129,9 @@ struct WidgetView: View {
                 VStack(spacing: 0) {
                     ForEach(store.rows) { row in
                         SessionRowView(
-                            row: row, onDecide: store.decide, onAnswer: store.answer, onRemove: { store.remove(row) },
-                            onMarkRead: { store.markRead(row) }, onOpenPopup: { store.openReply(row) }
+                            row: row, canHandOff: row.sessionId.map(store.readyForDesktop.contains) ?? false,
+                            onDecide: store.decide, onAnswer: store.answer, onRemove: { store.remove(row) },
+                            onMarkRead: { store.markRead(row) }, onOpenPopup: { store.openReply(row) }, onHandOff: { store.handOff(row) }
                         )
                         .onTapGesture {
                             if ClickModifiers.current().contains(.command) { store.openPreferred(row) } else { store.openReply(row) }
@@ -161,72 +159,64 @@ struct HeaderIconButton: View {
     var hoverColor: Color = Color.primary
     let action: () -> Void
 
-    @State private var pointerInside = false
-
-    private var hovering: Bool { pointerInside || HoverPreview.symbol == symbol }
-
     var body: some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 10, weight: .bold))
-                .foregroundStyle(hovering ? Color.primary : Color.secondary)
-                .frame(width: 24, height: 24)
-                .background(Circle().fill(hovering ? hoverColor.opacity(0.22) : Color.primary.opacity(0.08)))
-                .scaleEffect(hovering ? 1.1 : 1)
-                .animation(.easeOut(duration: 0.12), value: hovering)
-        }
-        .buttonStyle(PressScaleStyle())
-        .onHover { pointerInside = $0 }
-    }
-}
-
-struct PressScaleStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.88 : 1)
-            .animation(.easeOut(duration: 0.08), value: configuration.isPressed)
+        CircleIconButton(symbol: symbol, size: 24, hoverColor: hoverColor, action: action)
     }
 }
 
 struct HeaderView: View {
+    private static let baseWidthWithTitle: CGFloat = 310
+    private static let badgeWidth: CGFloat = 105
+    private static let updateIconWidth: CGFloat = 32
+
     let needsYouCount: Int
     @Binding var collapsed: Bool
     let updateVersion: String?
     let onUpdate: () -> Void
-    let onAdd: () -> Void
+    let onSearch: () -> Void
+    let onNewSession: () -> Void
     let onQuit: () -> Void
 
+    private var requiredWidthForTitle: CGFloat {
+        Self.baseWidthWithTitle + (needsYouCount > 0 ? Self.badgeWidth : 0) + (updateVersion != nil ? Self.updateIconWidth : 0)
+    }
+
     var body: some View {
-        HStack(spacing: 8) {
-            HeaderIconButton(symbol: collapsed ? "chevron.right" : "chevron.down") { collapsed.toggle() }
-            Image(systemName: "asterisk")
-                .font(.system(size: 13, weight: .heavy))
-                .foregroundStyle(ReplyMetrics.accent)
-            Text("Claude Code")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-            Spacer(minLength: 4)
-            if needsYouCount > 0 {
-                Text("\(needsYouCount) need\(needsYouCount == 1 ? "s" : "") you")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(Capsule().fill(Color.red))
-                    .fixedSize()
-                    .layoutPriority(1)
+        GeometryReader { geometry in
+            HStack(spacing: 8) {
+                HeaderIconButton(symbol: collapsed ? "chevron.right" : "chevron.down") { collapsed.toggle() }
+                Image(systemName: "asterisk")
+                    .font(.system(size: 13, weight: .heavy))
+                    .foregroundStyle(ReplyMetrics.accent)
+                if geometry.size.width >= requiredWidthForTitle {
+                    Text("Claude Code")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 4)
+                if needsYouCount > 0 {
+                    Text("\(needsYouCount) need\(needsYouCount == 1 ? "s" : "") you")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Capsule().fill(Color.red))
+                        .fixedSize()
+                        .layoutPriority(1)
+                }
+                if let updateVersion {
+                    HeaderIconButton(symbol: "arrow.down.circle.fill", hoverColor: ReplyMetrics.accent, action: onUpdate)
+                        .help("Update to \(updateVersion)")
+                }
+                HeaderIconButton(symbol: "magnifyingglass", action: onSearch).help("Find an existing session to add")
+                HeaderIconButton(symbol: "plus", action: onNewSession).help("New session")
+                HeaderIconButton(symbol: "xmark", hoverColor: .red, action: onQuit)
             }
-            if let updateVersion {
-                HeaderIconButton(symbol: "arrow.down.circle.fill", hoverColor: ReplyMetrics.accent, action: onUpdate)
-                    .help("Update to \(updateVersion)")
-            }
-            HeaderIconButton(symbol: "plus", action: onAdd).help("Add an existing session")
-            HeaderIconButton(symbol: "xmark", hoverColor: .red, action: onQuit)
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 12)
+            .frame(maxHeight: .infinity)
         }
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 12)
         .frame(height: WidgetMetrics.headerHeight)
         .contentShape(Rectangle())
         .gesture(WindowDragGesture())
@@ -235,11 +225,13 @@ struct HeaderView: View {
 
 struct SessionRowView: View {
     let row: SessionRow
+    let canHandOff: Bool
     let onDecide: (PermissionRequest, PermissionDecision) -> Void
     let onAnswer: (PermissionRequest, [String: String]) -> Void
     let onRemove: () -> Void
     let onMarkRead: () -> Void
     let onOpenPopup: () -> Void
+    let onHandOff: () -> Void
 
     @State private var pointerInside = false
 
@@ -296,20 +288,27 @@ struct SessionRowView: View {
             }
             Spacer(minLength: 4)
             if let agents = row.agents { AgentChip(progress: agents) }
+            if canHandOff {
+                Button(action: onHandOff) {
+                    Label("Desktop", systemImage: "arrow.up.forward.app").lineLimit(1).fixedSize()
+                }
+                .buttonStyle(PillButtonStyle(tint: StatusPalette.done))
+                .help("Ready: open this session in Claude Desktop")
+            }
             if hovering {
                 HStack(spacing: 6) {
                     if row.state == .unread {
                         Button(action: onMarkRead) {
                             Image(systemName: "checkmark.circle.fill").font(.system(size: 15))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(PressScaleStyle())
                         .foregroundStyle(StatusPalette.done)
                         .help("Mark as read")
                     }
                     Button(action: onRemove) {
                         Image(systemName: "xmark.circle.fill").font(.system(size: 15))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PressScaleStyle())
                     .foregroundStyle(.secondary)
                     .help("Remove from widget")
                 }
@@ -359,19 +358,6 @@ struct RequestCard: View {
                 Spacer()
             }
         }
-    }
-}
-
-struct ActionButtonStyle: ButtonStyle {
-    let color: Color
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 6)
-            .background(Capsule().fill(color.opacity(configuration.isPressed ? 0.65 : 0.95)))
     }
 }
 
@@ -477,7 +463,7 @@ struct OptionButton: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.primary.opacity(hovering ? 0.18 : 0.09)))
         }
-        .buttonStyle(PressScaleStyle())
+        .buttonStyle(PressScaleStyle(lifts: false))
         .help(description)
         .onHover { hovering = $0 }
     }

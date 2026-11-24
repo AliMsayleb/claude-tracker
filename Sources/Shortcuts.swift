@@ -16,6 +16,7 @@ enum ShortcutCatalog {
     static let sections: [ShortcutSection] = [
         ShortcutSection(title: "Anywhere", items: [
             ShortcutItem(keys: ["⌘", "⌘"], action: "Double-tap ⌘ to show or hide the widget"),
+            ShortcutItem(keys: ["⌃", "⌥", "N"], action: "Start a new session from any app (opens the New session window on the widget's monitor; press again to close it)"),
             ShortcutItem(keys: ["⌘ Space"], action: "Spotlight: type “tracker” to open Claude Tracker again after quitting it"),
         ]),
         ShortcutSection(title: "The widget", items: [
@@ -24,12 +25,13 @@ enum ShortcutCatalog {
             ShortcutItem(keys: ["✓ on a row"], action: "Hover an unread row and click ✓ to mark it read"),
             ShortcutItem(keys: ["Allow", "Deny"], action: "Answer a permission request right in the widget"),
             ShortcutItem(keys: ["Option buttons"], action: "Answer a multiple-choice question from Claude right in the row (multi-select and several questions open in the popup)"),
-            ShortcutItem(keys: ["+"], action: "Add an existing Desktop session (type to search)"),
+            ShortcutItem(keys: ["🔍"], action: "Find an existing Desktop session and add it (type to search)"),
+            ShortcutItem(keys: ["+"], action: "Start a brand-new session: pick a folder and a prompt, then open it in Desktop, Terminal, the background, or the background then Desktop"),
             ShortcutItem(keys: ["✕ on a row"], action: "Hover a row and click ✕ to remove it from the widget"),
             ShortcutItem(keys: ["⌄"], action: "Collapse the widget to its header, or expand it again"),
             ShortcutItem(keys: ["Drag header"], action: "Move the widget anywhere"),
             ShortcutItem(keys: ["Drag edge"], action: "Resize from the left, right or bottom edge (the size is remembered)"),
-            ShortcutItem(keys: ["Right-click header"], action: "Choose what ⌘-click opens, set up Allow / Deny, check for updates, launch at login, enable the ⌘ shortcut, shortcuts, quit"),
+            ShortcutItem(keys: ["Right-click header"], action: "Choose what ⌘-click opens, start a new session, set up Allow / Deny, check for updates, launch at login, enable the ⌘ shortcut, shortcuts, quit"),
         ]),
         ShortcutSection(title: "The reply popup", items: [
             ShortcutItem(keys: ["Return"], action: "Send your reply"),
@@ -76,12 +78,8 @@ struct ShortcutsView: View {
                     Text("Everything you can do with Claude Tracker").font(.system(size: 13)).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button(action: onClose) {
-                    Image(systemName: "xmark").font(.system(size: 12, weight: .bold)).frame(width: 28, height: 28)
-                        .background(Circle().fill(Color.primary.opacity(0.1)))
-                }
-                .buttonStyle(.plain)
-                .keyboardShortcut(.cancelAction)
+                CircleIconButton(symbol: "xmark", size: 28, action: onClose)
+                    .keyboardShortcut(.cancelAction)
             }
             .padding(.horizontal, 26).padding(.top, 22).padding(.bottom, 14)
             Divider().opacity(0.5)

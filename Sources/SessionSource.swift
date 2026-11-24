@@ -14,6 +14,8 @@ struct SessionSource {
     let detail: (SessionRow) -> String?
     let markSeen: (SessionRow) -> Void
     let send: (SessionRow, String) throws -> Void
+    let startSession: (NewSessionRequest, @escaping (Result<String, NewSessionError>) -> Void) -> Void
+    let handOff: (String) -> Void
     let shutdown: () -> Void
 }
 
@@ -32,6 +34,8 @@ extension SessionSource {
         detail: SessionDetail.lastAssistantText,
         markSeen: LiveSessions.markSeen,
         send: { try SessionMessenger.send($1, to: $0) },
+        startSession: NewSessionLauncher.start,
+        handOff: HandOffCenter.shared.handOff,
         shutdown: PermissionRequests.stopBeating
     )
 
@@ -54,6 +58,18 @@ extension SessionSource {
         detail: { _ in "## Done\nI **refactored** 3 screens and ran `swift test`.\n- First item with *emphasis*\n- Second item\n1. Numbered step\n```\nlet answer = 42\n```" },
         markSeen: { Console.line("seen pid=\($0.pid)") },
         send: { Console.line("send pid=\($0.pid) \($1)") },
+        startSession: { request, completion in
+            do { try NewSessionLauncher.validate(request) } catch {
+                completion(.failure(error as? NewSessionError ?? .launchFailed(error.localizedDescription)))
+                return
+            }
+            Console.line("start \(request.target.rawValue) \(request.folder ?? "none") \(request.prompt.replacingOccurrences(of: "\n", with: "\\n"))")
+            completion(.success("started"))
+        },
+        handOff: { id in
+            Console.line("handoff \(id)")
+            HandOffCenter.shared.consume(id)
+        },
         shutdown: {}
     )
 }

@@ -18,6 +18,21 @@ struct LaunchOptions {
     let testMarkdown: Bool
     let testTyping: Bool
     let testResize: Bool
+    let previewAllHover: Bool
+    let testKeyboardIsolation: Bool
+    let openNewSession: Bool
+    let newSessionSize: (width: Double, height: Double)?
+    let noFolder: Bool
+    let previewHandOff: Bool
+    let draft: (folder: String, prompt: String)?
+    let startTarget: NewSessionTarget?
+    let adoptCommand: [String]?
+    let resumeURLId: String?
+    let popupScreenCommand: [String]?
+    let testHotKey: Bool
+    let printHotKey: Bool
+    let idleCommand: [String]?
+    let newSessionCommand: (action: String, target: NewSessionTarget, folder: String, prompt: String)?
     let startCollapsed: Bool
     let updateCommand: [String]?
     let hookCommand: String?
@@ -49,6 +64,27 @@ struct LaunchOptions {
         testMarkdown = arguments.contains("--test-markdown")
         testTyping = arguments.contains("--test-typing")
         testResize = arguments.contains("--test-resize")
+        previewAllHover = arguments.contains("--preview-all-hover")
+        testKeyboardIsolation = arguments.contains("--test-keyboard-isolation")
+        openNewSession = arguments.contains("--open-new-session")
+        newSessionSize = Self.values(after: "--new-session-size", count: 2, in: arguments).flatMap { values in
+            Double(values[0]).flatMap { width in Double(values[1]).map { (width, $0) } }
+        }
+        noFolder = arguments.contains("--new-session-no-folder")
+        previewHandOff = arguments.contains("--preview-handoff")
+        draft = Self.values(after: "--draft-new-session", count: 2, in: arguments).map { ($0[0], $0[1]) }
+        startTarget = Self.values(after: "--start-new-session", count: 1, in: arguments).flatMap { NewSessionTarget(rawValue: $0[0]) }
+        newSessionCommand = ["--print-new-session", "--start-session"].compactMap { flag in
+            Self.values(after: flag, count: 3, in: arguments).flatMap { values in
+                NewSessionTarget(rawValue: values[0]).map { (flag, $0, values[1], values[2]) }
+            }
+        }.first
+        adoptCommand = Self.values(after: "--print-adopt", count: 4, in: arguments)
+        idleCommand = Self.values(after: "--print-idle", count: 2, in: arguments)
+        popupScreenCommand = Self.values(after: "--print-popup-screen", count: 2, in: arguments)
+        testHotKey = arguments.contains("--test-hotkey")
+        printHotKey = arguments.contains("--print-hotkey")
+        resumeURLId = Self.values(after: "--print-resume-url", count: 1, in: arguments)?.first
         startCollapsed = arguments.contains("--start-collapsed")
         updateCommand = arguments.firstIndex { ["--check-update", "--download-update", "--print-update-script", "--test-version-compare"].contains($0) }
             .map { Array(arguments[$0...]) }

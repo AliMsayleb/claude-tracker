@@ -9,8 +9,11 @@ final class SessionStore: ObservableObject {
     @Published private(set) var sendStatus: String?
     @Published private(set) var pickerOpen = false
     @Published private(set) var shortcutsOpen = false
+    @Published private(set) var newSessionOpen = false
     @Published private(set) var updateVersion: String?
+    @Published private(set) var readyForDesktop = Set<String>()
 
+    let newSession: NewSessionModel
     private let source: SessionSource
     private var decidedRequestIds = Set<String>()
     private var timer: Timer?
@@ -18,9 +21,13 @@ final class SessionStore: ObservableObject {
     private var refreshing = false
     private var refreshAgain = false
     private let queue = DispatchQueue(label: "claude-widget.refresh", qos: .userInitiated)
+    private var handOffSubscription: AnyCancellable?
 
     init(source: SessionSource) {
         self.source = source
+        newSession = NewSessionModel(starter: source.startSession)
+        newSession.onFinished = { [weak self] in self?.closeNewSession() }
+        handOffSubscription = HandOffCenter.shared.$ready.receive(on: DispatchQueue.main).sink { [weak self] in self?.readyForDesktop = $0 }
     }
 
     func start() {
@@ -44,6 +51,11 @@ final class SessionStore: ObservableObject {
         source.markSeen(row)
         source.openTerminal(row)
         refresh()
+    }
+
+    func handOff(_ row: SessionRow) {
+        guard let sessionId = row.sessionId else { return }
+        source.handOff(sessionId)
     }
 
     func markRead(_ row: SessionRow) {
@@ -72,6 +84,16 @@ final class SessionStore: ObservableObject {
     }
 
     func setUpdate(_ version: String?) { updateVersion = version }
+
+    func openNewSession() {
+        newSession.prepare()
+        newSessionOpen = true
+    }
+
+    func closeNewSession() {
+        newSessionOpen = false
+        newSession.folder = nil
+    }
 
     func openShortcuts() { shortcutsOpen = true }
 

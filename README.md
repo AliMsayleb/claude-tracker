@@ -17,8 +17,8 @@ Claude Code sessions pile up fast, and it is easy to miss the one waiting for yo
 |---|---|
 | **Needs permission:** allow or deny right in the widget, or in the popup | **Questions from Claude:** answer multiple-choice questions with one click, or type your own answer |
 | <img src="docs/screenshots/popup-permission.png" alt="Permission request in the popup" width="480"> | <img src="docs/screenshots/popup-question.png" alt="A multiple-choice question in the popup" width="480"> |
-| **Sub-agent counter:** the `4/6` chip shows finished out of started | |
-| <img src="docs/screenshots/widget.png" alt="Widget with the sub-agent counter and a question" width="240"> | |
+| **Sub-agent counter:** the `4/6` chip shows finished out of started | **New session:** start one in Desktop, Terminal, the background, or the background then Desktop |
+| <img src="docs/screenshots/widget.png" alt="Widget with the sub-agent counter and a question" width="240"> | <img src="docs/screenshots/new-session.png" alt="The new-session window" width="480"> |
 | **Add a session:** search your existing Desktop sessions | **Shortcuts & tips:** built in, opens on first launch |
 | <img src="docs/screenshots/add-session.png" alt="The add-session search window" width="480"> | <img src="docs/screenshots/shortcuts.png" alt="The shortcuts window" width="480"> |
 
@@ -71,6 +71,7 @@ Users can see this list inside the app: right-click the widget header and choose
 | Shortcut | What it does |
 |---|---|
 | ⌘ ⌘ | Double-tap ⌘ to show or hide the widget |
+| ⌃ ⌥ N | Start a new session from any app (opens the New session window on the widget's monitor; press again to close it) |
 | ⌘ Space | Spotlight: type “tracker” to open Claude Tracker again after quitting it |
 
 ### The widget
@@ -82,12 +83,13 @@ Users can see this list inside the app: right-click the widget header and choose
 | ✓ on a row | Hover an unread row and click ✓ to mark it read |
 | Allow Deny | Answer a permission request right in the widget |
 | Option buttons | Answer a multiple-choice question from Claude right in the row (multi-select and several questions open in the popup) |
-| + | Add an existing Desktop session (type to search) |
+| 🔍 | Find an existing Desktop session and add it (type to search) |
+| + | Start a brand-new session: pick a folder and a prompt, then open it in Desktop, Terminal, the background, or the background then Desktop |
 | ✕ on a row | Hover a row and click ✕ to remove it from the widget |
 | ⌄ | Collapse the widget to its header, or expand it again |
 | Drag header | Move the widget anywhere |
 | Drag edge | Resize from the left, right or bottom edge (the size is remembered) |
-| Right-click header | Choose what ⌘-click opens, set up Allow / Deny, check for updates, launch at login, enable the ⌘ shortcut, shortcuts, quit |
+| Right-click header | Choose what ⌘-click opens, start a new session, set up Allow / Deny, check for updates, launch at login, enable the ⌘ shortcut, shortcuts, quit |
 
 ### The reply popup
 
@@ -126,7 +128,7 @@ Rows are sorted in this order, so anything that needs you is at the top.
 | 3 | New reply | Amber / yellow | Claude finished and you have not looked at the session yet. Stays until you reply or open the chat in Desktop. Opening the popup does not clear it. Desktop sessions only. | Desktop: last turn ended after you last focused the session |
 | 4 | Working | Blue | Claude is running. | Registry: `busy` |
 | 5 | Done | Green | Finished and you have seen it. | Registry: `idle` |
-| 5 | Not running | Purple | A session you added with **+** that is not running. | Desktop session list |
+| 5 | Not running | Purple | A session you added with the 🔍 button that is not running. | Desktop session list |
 
 Red, orange and amber rows are tinted, have a colored bar on the left, and a soft halo around their dot. Working, Done and Not running are plain. The subtitle shows the session's own one-line summary when Desktop has one (what it needs from you, or what it finished). Otherwise it shows the folder.
 
@@ -137,9 +139,15 @@ Build and install from a clone (needs Xcode) with `scripts/install-app.sh`. For 
 **The widget**
 - Click a row to open the reply popup. **⌘-click** a row to open the session in your default app, **Claude Desktop** or **Terminal** (choose in the right-click menu; this also marks it as read). Terminal runs `claude --resume <session>` in the session's folder.
 - Hover a row to get two small buttons: **✓** (unread rows only) marks the session as read without opening it, and **✕** removes it from the widget.
+- **New session:** click **+** in the header, press **⌃⌥N** from any app (press it again to close the window), or right-click the header > "New session…" to start a brand-new Claude session without leaving what you are doing. Pick a folder (your recent ones, another one, or **No folder**, which is the default each time, which reuses one of Claude Desktop's own already-trusted scratch folders, or the widget's own empty `~/.claude-widget/no-folder` if there is none; a background session there needs that folder trusted once, by running `claude` in it), write the prompt, and choose where it starts from the drop-down. The window is resizable and remembers its size:
+  - **Desktop** opens Claude Desktop's new-session screen with the folder and prompt filled in; press Enter there to send.
+  - **Terminal** opens Terminal and runs `claude` in that folder with your prompt.
+  - **Background** runs `claude --bg`: no window, it shows up in the widget and you can open it any time. Permission prompts can be answered with Allow / Deny here (needs the hook).
+  - **Background → Desktop** starts the session in the background. When its first answer is ready, a green **Desktop** button appears on its row. Nothing opens by itself: when you click it, the widget stops the background copy (Claude Code will not let Desktop open a session a background process still holds) and opens the session in Claude Desktop. Desktop always brings itself to the front when it opens a link, so it flashes for a moment and your previous app comes back. The button is lost if you quit the widget before clicking it; the session itself keeps running.
+  The last "Start it in" choice is remembered. Prompts are passed to the shell safely quoted, so quotes, `$(…)` and backticks in a prompt are never executed.
 - A blue **done/total** chip on a row (for example `4/6`) counts the sub-agents the session started during its current turn: finished out of started. It turns green when all are done. Agents started in the background are counted as finished when they launch.
--  Use **+** to add an existing Desktop session: a search window lists your other non-archived sessions (type to filter, Return adds the first match). Added sessions that are not running show as "Not running" (⌘-click one to resume it in Desktop).
-- The chevron collapses the list to the header. Drag the left, right or bottom edge to resize (the widget has its own edge handles, and the cursor changes to a resize arrow over them; this uses a private macOS switch, "SetsCursorInBackground", because background apps cannot normally change the cursor): the width is remembered, and the height you choose becomes the maximum (the list scrolls beyond it, and the window shrinks to fit when there are fewer rows). The header buttons (collapse, **+**, ✕) highlight when you hover them; ✕ turns red.
+-  Use the **🔍** button to find an existing Desktop session and add it: a search window lists your other non-archived sessions (type to filter, Return adds the first match). Added sessions that are not running show as "Not running" (⌘-click one to resume it in Desktop).
+- The chevron collapses the list to the header. Drag the left, right or bottom edge to resize (the widget has its own edge handles, and the cursor changes to a resize arrow over them; this uses a private macOS switch, "SetsCursorInBackground", because background apps cannot normally change the cursor): the width is remembered, and the height you choose becomes the maximum (the list scrolls beyond it, and the window shrinks to fit when there are fewer rows). Every button and clickable item highlights when you hover it; ✕ turns red. `CLAUDE.md` holds the project rules (hover on everything is one of them; `tests/hover.sh` enforces it).
 - Right-click the header for what ⌘-click opens, "Set up Allow / Deny buttons…", "Launch at login", "Enable double-tap ⌘ shortcut…", the shortcuts window and "Quit". The ✕ in the header also quits.
 - **Double-tap ⌘** shows or hides the widget. This is the only permission the widget asks for: Accessibility, so it can see the ⌘ key while another app is in front. It asks once; macOS forgets the grant whenever the app is rebuilt, so grant it again from the right-click menu.
 
@@ -211,13 +219,14 @@ tests/run_all.sh
 | `widget_window` | Search, widget height cap, the add-session window, and that test runs leave your preferences untouched |
 | `widget_resize` | The edge-resize maths, scripted drags of the left, right and bottom edges, and the resize cursor areas |
 | `updates` | Version comparison, finding a newer release, checksum refusal, missing/unreachable downloads, and replacing the app (against a fake release made of local files) |
+| `new_session` | New-session scripts and links against a fake `claude` (quoting, the folder, a leading dash, injection attempts), validation, and the window |
 | `install_app`, `uninstall`, `terminal` | The source installer and uninstaller on temp folders, and the Terminal launch script (quoting, input checks) |
 
-Not covered by automated tests: real ⌘Tab and clipboard-manager behaviour, real mouse hover and dragging (the tests send scripted events), and replies into a Desktop session's own window. `tests/drive_claude.py` and `tests/e2e_send.py` drive a real Claude session end to end (they cost a few cents and are run by hand).
+Not covered by automated tests: real ⌘Tab and clipboard-manager behaviour, real mouse hover and dragging (the tests send scripted events), and replies into a Desktop session's own window. `tests/drive_claude.py`, `tests/e2e_send.py`, `tests/e2e_question.py` and `tests/e2e_new_session.sh` drive real Claude sessions end to end (they cost a few cents and are run by hand).
 
 ## Debug flags
 
-`--dump` (print rows as JSON), `--sample` (fake data; never touches your real sessions or preferences), `--gc` (one cleanup pass), `--decide <id> allow|deny`, `--send <pid> <text>`, `--detail <pid>`, `--time-detail <pid>`, `--snapshot <png>` (also writes `-reply.png` / `-picker.png` for open popups), `--click <x> <y>`, `--command-click <x> <y>`, and the `--check-update`, `--download-update <dir>`, `--print-update-script <pid> <new app> <destination>` (the update steps, testable against a fake release with `CLAUDE_TRACKER_UPDATE_URL`), `--preview-hover <sf-symbol-name>` (render a header button in its hover state), and the `--test-*` flags used by the test suites. In `--sample` mode the windows are parked off-screen, so test runs never appear on your display.
+`--dump` (print rows as JSON), `--sample` (fake data; never touches your real sessions or preferences), `--gc` (one cleanup pass), `--decide <id> allow|deny`, `--send <pid> <text>`, `--detail <pid>`, `--time-detail <pid>`, `--snapshot <png>` (also writes `-reply.png` / `-picker.png` for open popups), `--click <x> <y>`, `--command-click <x> <y>`, and the `--print-new-session <desktop|terminal|background|backgroundDesktop> <folder> <prompt>` (show the link or script without running it), `--start-session <target> <folder> <prompt>`, `--check-update`, `--download-update <dir>`, `--print-update-script <pid> <new app> <destination>` (the update steps, testable against a fake release with `CLAUDE_TRACKER_UPDATE_URL`), `--preview-hover <sf-symbol-name>` (render a header button in its hover state), `--preview-all-hover` (render every window with all hover effects on), and the `--test-*` flags used by the test suites. In `--sample` mode the windows are parked off-screen, so test runs never appear on your display.
 
 ## Project layout
 

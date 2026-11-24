@@ -2,9 +2,23 @@ import AppKit
 import Combine
 import SwiftUI
 
+enum TestInput {
+    static var ignoresRealKeyboard = false
+    static var sendingScriptedKeys = false
+
+    static func shouldDrop(_ event: NSEvent) -> Bool {
+        ignoresRealKeyboard && !sendingScriptedKeys && [.keyDown, .keyUp, .flagsChanged].contains(event.type)
+    }
+}
+
 final class KeyablePanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+
+    override func sendEvent(_ event: NSEvent) {
+        if TestInput.shouldDrop(event) { return }
+        super.sendEvent(event)
+    }
 }
 
 final class FloatingPanel: NSPanel {
@@ -15,6 +29,11 @@ final class FloatingPanel: NSPanel {
 final class ReplyPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+
+    override func sendEvent(_ event: NSEvent) {
+        if TestInput.shouldDrop(event) { return }
+        super.sendEvent(event)
+    }
 
     var onClose: (() -> Void)?
 
@@ -72,6 +91,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var resizeObserver: NSObjectProtocol?
     private var pickerPanel: KeyablePanel!
     private var shortcutsPanel: KeyablePanel!
+    private var newSessionPanel: KeyablePanel!
+    private var newSessionObserver: AnyCancellable?
     private var shortcutsObserver: AnyCancellable?
     private var shortcutsResignObserver: NSObjectProtocol?
     private var pickerObserver: AnyCancellable?
@@ -80,10 +101,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let resizer = WidgetResizer()
     private lazy var updates: UpdateController? = options.useSample ? nil : UpdateController(store: store)
     private var savedDefaults: [String: Any] = [:]
-    private static let sandboxedKeys = ["replyPopupSize", "replyFontScale", "widgetMaxHeight", "collapsed", "openTarget"]
+    private static let sandboxedKeys = ["replyPopupSize", "replyFontScale", "widgetMaxHeight", "collapsed", "openTarget", "newSessionTarget", "newSessionSize"]
+    private static let newSessionSizeKey = "newSessionSize"
+    private var isApplyingNewSessionSize = false
+    private var newSessionResizeObserver: Any?
     private var isApplyingReplySize = false
     private var replyHostingView: NSHostingView<ReplyView>!
     private var doubleCommandTap: DoubleCommandTap?
+    private var newSessionHotKey: NewSessionHotKey?
 
     init(store: SessionStore, options: LaunchOptions) {
         self.store = store
@@ -94,13 +119,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         if options.useSample {
             for key in Self.sandboxedKeys { savedDefaults[key] = UserDefaults.standard.object(forKey: key) }
-            for key in ["replyPopupSize", "replyFontScale", "widgetMaxHeight", "collapsed"] { UserDefaults.standard.removeObject(forKey: key) }
+            for key in ["replyPopupSize", "replyFontScale", "widgetMaxHeight", "collapsed", "newSessionTarget", "newSessionSize"] { UserDefaults.standard.removeObject(forKey: key) }
+            store.newSession.forgetSavedChoices()
             if options.startCollapsed { UserDefaults.standard.set(true, forKey: "collapsed") }
             UserDefaults.standard.set(900.0, forKey: Self.widgetMaxHeightKey)
         }
+        TestInput.ignoresRealKeyboard = options.useSample
         if options.useSample { ClickModifiers.current = { [options] in options.commandClick ? .command : [] } }
         HoverPreview.symbol = options.previewHover
-        RowHoverPreview.enabled = options.previewRowHover
+        RowHoverPreview.enabled = options.previewRowHover || options.previewAllHover
+        HoverPreview.forceAll = options.previewAllHover
         installMainMenu()
         let backgroundCursorEnabled = BackgroundCursor.enable()
         if options.testCursors { Console.line("background cursor enabled=\(backgroundCursorEnabled)") }
@@ -174,6 +202,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         shortcutsPanel.backgroundColor = .clear
         shortcutsPanel.hasShadow = true
         shortcutsPanel.hidesOnDeactivate = false
+        newSessionPanel = KeyablePanel(
+            contentRect: NSRect(x: 0, y: 0, width: NewSessionMetrics.width, height: NewSessionMetrics.height),
+            styleMask: [.borderless, .resizable, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        newSessionPanel.contentView = NSHostingView(rootView: NewSessionView(model: store.newSession, onClose: { [weak self] in self?.store.closeNewSession() }))
+        newSessionPanel.level = .floating
+        newSessionPanel.isOpaque = false
+        newSessionPanel.backgroundColor = .clear
+        newSessionPanel.hasShadow = true
+        newSessionPanel.hidesOnDeactivate = false
+        newSessionPanel.isMovableByWindowBackground = true
+        newSessionPanel.minSize = NSSize(width: NewSessionMetrics.minWidth, height: NewSessionMetrics.minHeight)
+        newSessionResizeObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didResizeNotification, object: newSessionPanel, queue: .main
+        ) { [weak self] _ in self?.rememberNewSessionSize() }
+        newSessionObserver = store.$newSessionOpen
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] open in self?.showNewSession(open) }
         shortcutsObserver = store.$shortcutsOpen
             .receive(on: DispatchQueue.main)
             .sink { [weak self] open in self?.showShortcuts(open) }
@@ -196,6 +244,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if !options.useSample {
             doubleCommandTap = DoubleCommandTap { [weak self] in self?.toggleVisibility() }
             doubleCommandTap?.start(promptForPermission: true)
+            newSessionHotKey = NewSessionHotKey { [weak self] in self?.toggleNewSessionFromHotKey() }
+            newSessionHotKey?.register()
+        }
+        if options.testHotKey {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+                Console.line("hotkey registered=\(self?.newSessionHotKey != nil)")
+                NSApp.terminate(nil)
+            }
         }
     }
 
@@ -207,10 +263,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if !options.useSample { NSApp.setActivationPolicy(.regular) }
         if !replyPanel.isVisible {
             applySavedReplySize()
-            if let screen = NSScreen.main {
-                let area = screen.visibleFrame
-                let size = replyPanel.frame.size
-                replyPanel.setFrameOrigin(parked(NSPoint(x: area.midX - size.width / 2, y: area.midY - size.height / 2 + area.height * 0.05)))
+            if let area = popupArea {
+                replyPanel.setFrameOrigin(parked(PopupScreen.centeredOrigin(size: replyPanel.frame.size, in: area, lift: 0.05)))
             }
             replyPanel.alphaValue = 0
         }
@@ -237,11 +291,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if store.replyKey != nil { replyPanel.makeKeyAndOrderFront(nil) }
     }
 
+    private func applySavedNewSessionSize() {
+        let stored = UserDefaults.standard.array(forKey: Self.newSessionSizeKey) as? [Double]
+        let saved = stored.flatMap { $0.count == 2 ? NSSize(width: $0[0], height: $0[1]) : nil }
+            ?? NSSize(width: NewSessionMetrics.width, height: NewSessionMetrics.height)
+        let limit = popupArea?.size ?? saved
+        isApplyingNewSessionSize = true
+        newSessionPanel.setContentSize(NSSize(
+            width: min(max(saved.width, NewSessionMetrics.minWidth), limit.width),
+            height: min(max(saved.height, NewSessionMetrics.minHeight), limit.height)
+        ))
+        isApplyingNewSessionSize = false
+    }
+
+    private func rememberNewSessionSize() {
+        guard !isApplyingNewSessionSize, newSessionPanel.isVisible else { return }
+        let size = newSessionPanel.contentRect(forFrameRect: newSessionPanel.frame).size
+        UserDefaults.standard.set([Double(size.width), Double(size.height)], forKey: Self.newSessionSizeKey)
+    }
+
     private func applySavedReplySize() {
         let stored = UserDefaults.standard.array(forKey: Self.replySizeKey) as? [Double]
         let saved = stored.flatMap { $0.count == 2 ? NSSize(width: $0[0], height: $0[1]) : nil }
             ?? NSSize(width: ReplyMetrics.width, height: ReplyMetrics.height)
-        let limit = NSScreen.main?.visibleFrame.size ?? saved
+        let limit = popupArea?.size ?? saved
         isApplyingReplySize = true
         replyPanel.setContentSize(NSSize(
             width: min(max(saved.width, ReplyMetrics.minWidth), limit.width),
@@ -291,6 +364,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         store.openShortcuts()
     }
 
+    private var popupArea: NSRect? {
+        (panel.screen ?? NSScreen.main)?.visibleFrame
+    }
+
+    private func toggleNewSessionFromHotKey() {
+        if store.newSessionOpen {
+            store.closeNewSession()
+            return
+        }
+        store.openNewSession()
+        NSApp.activate(ignoringOtherApps: true)
+        newSessionPanel.makeKeyAndOrderFront(nil)
+    }
+
     private func toggleVisibility() {
         if panel.isVisible {
             panel.orderOut(nil)
@@ -338,6 +425,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.async { [weak self] in self?.fitPanelToContent() }
     }
 
+    private func showNewSession(_ open: Bool) {
+        guard open else {
+            newSessionPanel.orderOut(nil)
+            return
+        }
+        applySavedNewSessionSize()
+        if let area = popupArea {
+            newSessionPanel.setFrameOrigin(parked(PopupScreen.centeredOrigin(size: newSessionPanel.frame.size, in: area)))
+        }
+        newSessionPanel.makeKeyAndOrderFront(nil)
+    }
+
     private func showShortcuts(_ open: Bool) {
         if let observer = shortcutsResignObserver {
             NotificationCenter.default.removeObserver(observer)
@@ -347,9 +446,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             shortcutsPanel.orderOut(nil)
             return
         }
-        if let screen = NSScreen.main {
-            let area = screen.visibleFrame
-            shortcutsPanel.setFrameOrigin(parked(NSPoint(x: area.midX - ShortcutsMetrics.width / 2, y: area.midY - ShortcutsMetrics.height / 2)))
+        if let area = popupArea {
+            shortcutsPanel.setFrameOrigin(parked(PopupScreen.centeredOrigin(size: NSSize(width: ShortcutsMetrics.width, height: ShortcutsMetrics.height), in: area)))
         }
         shortcutsPanel.makeKeyAndOrderFront(nil)
         guard !options.useSample else { return }
@@ -367,9 +465,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             pickerPanel.orderOut(nil)
             return
         }
-        if let screen = NSScreen.main {
-            let area = screen.visibleFrame
-            pickerPanel.setFrameOrigin(parked(NSPoint(x: area.midX - PickerMetrics.width / 2, y: area.midY - PickerMetrics.height / 2 + area.height * 0.05)))
+        if let area = popupArea {
+            pickerPanel.setFrameOrigin(parked(PopupScreen.centeredOrigin(size: NSSize(width: PickerMetrics.width, height: PickerMetrics.height), in: area, lift: 0.05)))
         }
         pickerPanel.makeKeyAndOrderFront(nil)
         guard !options.useSample else { return }
@@ -383,7 +480,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in self?.click(at: point) }
         }
         if options.testPopup { runPopupTest() }
+        if options.testKeyboardIsolation {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in self?.store.openNewSession() }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { [weak self] in self?.testKeyboardIsolation() }
+        }
         if options.testWidgetDrag { runWidgetDragTest() }
+        if let draft = options.draft {
+            store.newSession.folder = draft.folder
+            store.newSession.prompt = draft.prompt
+        }
+        if options.noFolder { store.newSession.folder = nil }
+        if options.previewHandOff { HandOffCenter.shared.markReady("sample-6") }
+        if options.openNewSession {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in self?.store.openNewSession() }
+        }
+        if let size = options.newSessionSize {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in self?.store.openNewSession() }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.3) { [weak self] in
+                self?.newSessionPanel.setContentSize(NSSize(width: size.width, height: size.height))
+            }
+        }
+        if let target = options.startTarget {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                self?.store.newSession.target = target
+                self?.store.newSession.start()
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) { NSApp.terminate(nil) }
+        }
         if options.openShortcuts {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in self?.store.openShortcuts() }
         }
@@ -478,6 +601,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func testKeyboardIsolation() {
+        func scripted(_ character: String) -> NSEvent? {
+            NSEvent.keyEvent(
+                with: .keyDown, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                windowNumber: 0, context: nil, characters: character, charactersIgnoringModifiers: character, isARepeat: false, keyCode: 0
+            )
+        }
+        func system(_ character: String) -> NSEvent? {
+            guard let cg = CGEvent(keyboardEventSource: nil, virtualKey: 16, keyDown: true) else { return nil }
+            var characters = Array(character.utf16)
+            cg.keyboardSetUnicodeString(stringLength: characters.count, unicodeString: &characters)
+            return NSEvent(cgEvent: cg)
+        }
+        let click = NSEvent.mouseEvent(
+            with: .leftMouseDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil,
+            eventNumber: 0, clickCount: 1, pressure: 1
+        )
+        let scriptedKey = scripted("x")
+        let realKey = system("y")
+        TestInput.sendingScriptedKeys = true
+        let scriptedKept = scriptedKey.map { !TestInput.shouldDrop($0) } ?? false
+        TestInput.sendingScriptedKeys = false
+        Console.line("scripted key kept=\(scriptedKept) "
+            + "unscripted key dropped=\(realKey.map { TestInput.shouldDrop($0) } ?? false) "
+            + "unscripted synthetic key dropped=\(scriptedKey.map { TestInput.shouldDrop($0) } ?? false) "
+            + "mouse kept=\(click.map { !TestInput.shouldDrop($0) } ?? false)")
+        NSApp.terminate(nil)
+    }
+
     private func runPopupTest() {
         let row = { [weak self] in self?.store.rows.first ?? SessionRow.placeholder }
         let defaults = UserDefaults.standard
@@ -528,7 +680,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 windowNumber: replyPanel.windowNumber, context: nil, characters: "\r", charactersIgnoringModifiers: "\r",
                 isARepeat: false, keyCode: 36
             )
+            TestInput.sendingScriptedKeys = true
             if let event { replyPanel.sendEvent(event) }
+            TestInput.sendingScriptedKeys = false
         }
         pressReturn(.shift)
         let afterShift = editor.string.replacingOccurrences(of: "\n", with: "\\n")
@@ -585,6 +739,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func writeNewSessionSnapshot(to path: String) {
+        guard newSessionPanel.isVisible, let view = newSessionPanel.contentView else { return }
+        if let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
+            view.cacheDisplay(in: view.bounds, to: bitmap)
+            try? bitmap.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path + "-newsession.png"))
+        }
+    }
+
     private func writeShortcutsSnapshot(to path: String) {
         guard shortcutsPanel.isVisible, let view = shortcutsPanel.contentView else { return }
         if let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
@@ -614,6 +776,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         writeReplySnapshot(to: path)
         writePickerSnapshot(to: path)
         writeShortcutsSnapshot(to: path)
+        writeNewSessionSnapshot(to: path)
         let bounds = hostingView.bounds
         if let bitmap = hostingView.bitmapImageRepForCachingDisplay(in: bounds) {
             hostingView.cacheDisplay(in: bounds, to: bitmap)

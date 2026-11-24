@@ -25,6 +25,8 @@ restore_target
 check "the green check on an unread row marks it read" "seen pid=5" "$(timeout 20 "$binary" --sample --preview-row-hover --click 270 505)"
 check "the cross on a row removes it" "remove pid=5" "$(timeout 20 "$binary" --sample --preview-row-hover --click 295 505)"
 
+check "the Desktop button on a ready row hands the session over" "handoff sample-6" "$(timeout 20 "$binary" --sample --preview-handoff --click 235 670)"
+check "a row that is not ready has no Desktop button" "" "$(timeout 20 "$binary" --sample --click 235 670)"
 check "clicking an option in a question row answers it" "answer sample-question Which environment should I deploy to?=Staging" "$(click 100 371)"
 check "clicking a later option answers with that option" "answer sample-question Which environment should I deploy to?=Cancel" "$(click 100 447)"
 check "plain click on the request text opens the popup only" "" "$(click 100 150)"

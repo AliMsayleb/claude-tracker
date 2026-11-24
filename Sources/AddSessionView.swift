@@ -29,12 +29,15 @@ struct AddSessionView: View {
             HStack {
                 Text("Add a session").font(.system(size: 17, weight: .semibold))
                 Spacer()
-                Button(action: onClose) {
-                    Image(systemName: "xmark").font(.system(size: 11, weight: .bold)).frame(width: 26, height: 26)
-                        .background(Circle().fill(Color.primary.opacity(0.1)))
+                Button {
+                    onClose()
+                    store.openNewSession()
+                } label: {
+                    Label("New session", systemImage: "plus.circle.fill").font(.system(size: 13, weight: .semibold))
                 }
-                .buttonStyle(.plain)
-                .keyboardShortcut(.cancelAction)
+                .buttonStyle(PillButtonStyle(tint: ReplyMetrics.accent))
+                CircleIconButton(symbol: "xmark", size: 26, action: onClose)
+                    .keyboardShortcut(.cancelAction)
             }
             .padding(.horizontal, 18).padding(.top, 16).padding(.bottom, 10)
             searchField
@@ -87,6 +90,7 @@ struct AddSessionView: View {
         .padding(.horizontal, 18).padding(.vertical, 9)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
+        .hoverHighlight(cornerRadius: 0, opacity: 0.08)
         .onTapGesture { add(session) }
     }
 
