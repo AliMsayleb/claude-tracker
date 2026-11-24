@@ -9,7 +9,7 @@ struct AgentProgress: Equatable, Codable {
 
 enum SessionDetail {
     private static let tailWindows: [UInt64] = [256_000, 2_000_000, 8_000_000]
-    private static let maxLength = 1200
+    private static let maxLength = 200_000
     private static let agentTools: Set<String> = ["Agent", "Task"]
 
     private static var projectsDirectory: URL {

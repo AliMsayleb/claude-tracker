@@ -106,6 +106,11 @@ check "expanded detail is the last assistant text" "Latest answer" "$("$binary" 
 check "sub-agent counter counts only the current turn, ignoring side chains and replies sent from the widget" "2/3" \
   "$(dump | jq -r '[.[] | select(.title == "Idle session")][0].agents | "\(.done)/\(.total)"')"
 check "no counter without sub-agents" "null" "$(dump | jq -c '[.[] | select(.title == "Working session")][0].agents')"
+long_text="$(python3 -I -c 'print("Paragraph one. " * 400 + "\n\nTHE-VERY-END")')"
+jq -cn --arg text "$long_text" '{type: "assistant", message: {content: [{type: "text", text: $text}]}}' > "$projects/-work-project/sess-b.jsonl"
+long_reply="$("$binary" --detail "$pid_b")"
+check "a long reply (6000+ characters) reaches the popup in full" "yes" \
+  "$([ "${#long_reply}" -gt 6000 ] && [[ "$long_reply" == *THE-VERY-END ]] && echo yes || echo no)"
 check "detail is empty when there is no transcript" "" "$("$binary" --detail "$pid_c")"
 rm -rf "$projects"; unset CLAUDE_PROJECTS_DIR
 
