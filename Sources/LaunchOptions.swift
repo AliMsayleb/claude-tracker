@@ -43,6 +43,10 @@ struct LaunchOptions {
     let testWidgetSize: Bool
     let midDragHeight: Double?
     let printConfigDirs: Bool
+    let previewTarget: NewSessionTarget?
+    let pickerListPreview: (kind: String, path: String)?
+    let withModel: ModelChoice
+    let withEffort: EffortChoice
     let widgetCap: Double?
     let testPopup: Bool
     let testReturnKey: Bool
@@ -96,6 +100,10 @@ struct LaunchOptions {
         testSearch = arguments.contains("--test-search")
         testWidgetSize = arguments.contains("--test-widget-size")
         widgetCap = Self.values(after: "--widget-cap", count: 1, in: arguments).flatMap { Double($0[0]) }
+        withModel = Self.values(after: "--with-model", count: 1, in: arguments).flatMap { ModelChoice(rawValue: $0[0]) } ?? .standard
+        withEffort = Self.values(after: "--with-effort", count: 1, in: arguments).flatMap { EffortChoice(rawValue: $0[0]) } ?? .standard
+        pickerListPreview = Self.values(after: "--snapshot-picker-list", count: 2, in: arguments).map { ($0[0], $0[1]) }
+        previewTarget = Self.values(after: "--new-session-target", count: 1, in: arguments).flatMap { NewSessionTarget(rawValue: $0[0]) }
         printConfigDirs = arguments.contains("--print-config-dirs")
         midDragHeight = Self.values(after: "--test-mid-drag", count: 1, in: arguments).flatMap { Double($0[0]) }
         testPopup = arguments.contains("--test-popup")

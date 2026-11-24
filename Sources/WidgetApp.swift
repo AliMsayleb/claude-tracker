@@ -101,7 +101,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let resizer = WidgetResizer()
     private lazy var updates: UpdateController? = options.useSample ? nil : UpdateController(store: store)
     private var savedDefaults: [String: Any] = [:]
-    private static let sandboxedKeys = ["replyPopupSize", "replyFontScale", "widgetMaxHeight", "collapsed", "openTarget", "newSessionTarget", "newSessionSize"]
+    private static let sandboxedKeys = ["replyPopupSize", "replyFontScale", "widgetMaxHeight", "collapsed", "openTarget", "newSessionTarget", "newSessionModel", "newSessionEffort", "newSessionSize"]
     private static let newSessionSizeKey = "newSessionSize"
     private var isApplyingNewSessionSize = false
     private var holdingFit = false
@@ -120,7 +120,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         if options.useSample {
             for key in Self.sandboxedKeys { savedDefaults[key] = UserDefaults.standard.object(forKey: key) }
-            for key in ["replyPopupSize", "replyFontScale", "widgetMaxHeight", "collapsed", "newSessionTarget", "newSessionSize"] { UserDefaults.standard.removeObject(forKey: key) }
+            for key in ["replyPopupSize", "replyFontScale", "widgetMaxHeight", "collapsed", "newSessionTarget", "newSessionModel", "newSessionEffort", "newSessionSize"] { UserDefaults.standard.removeObject(forKey: key) }
             store.newSession.forgetSavedChoices()
             if options.startCollapsed { UserDefaults.standard.set(true, forKey: "collapsed") }
             UserDefaults.standard.set(900.0, forKey: Self.widgetMaxHeightKey)
@@ -492,6 +492,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             store.newSession.prompt = draft.prompt
         }
         if options.noFolder { store.newSession.folder = nil }
+        if let target = options.previewTarget { store.newSession.target = target }
         if options.openNewSession {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in self?.store.openNewSession() }
         }

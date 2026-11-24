@@ -79,7 +79,16 @@ unset CLAUDE_TRACKER_SCRATCH_ROOT CLAUDE_TRACKER_CLAUDE_JSON
 timeout 20 "$binary" --sample --new-session-size 900 700 --new-session-no-folder --snapshot "$work/big.png" > /dev/null
 check "the new-session window can be resized" "1800x1400" "$(sips -g pixelWidth -g pixelHeight "$work/big.png-newsession.png" | awk '/pixelWidth/ {w=$2} /pixelHeight/ {h=$2} END {print w "x" h}')"
 timeout 20 "$binary" --sample --open-new-session --snapshot "$work/normal.png" > /dev/null
-check "the window opens at its normal size again after a resize" "1200x1080" "$(sips -g pixelWidth -g pixelHeight "$work/normal.png-newsession.png" | awk '/pixelWidth/ {w=$2} /pixelHeight/ {h=$2} END {print w "x" h}')"
+check "the window opens at its normal size again after a resize" "1200x1320" "$(sips -g pixelWidth -g pixelHeight "$work/normal.png-newsession.png" | awk '/pixelWidth/ {w=$2} /pixelHeight/ {h=$2} END {print w "x" h}')"
 
+
+for target in terminal background; do
+  "$binary" --print-new-session "$target" "$folder" "hi" --with-model opus --with-effort xhigh > "$work/choice-$target.sh"
+  args="$(PATH="$work/bin:$PATH" zsh "$work/choice-$target.sh" | grep '^ARG:' | tr '\n' '|')"
+  check "$target: the chosen model is passed to claude" "yes" "$(printf '%s' "$args" | grep -q 'ARG:--model|ARG:opus|' && echo yes || echo no)"
+  check "$target: the chosen effort is passed to claude" "yes" "$(printf '%s' "$args" | grep -q 'ARG:--effort|ARG:xhigh|' && echo yes || echo no)"
+  "$binary" --print-new-session "$target" "$folder" "hi" > "$work/default-$target.sh"
+  check "$target: no model or effort flags unless chosen" "0" "$(grep -c -e '--model' -e '--effort' "$work/default-$target.sh")"
+done
 
 finish

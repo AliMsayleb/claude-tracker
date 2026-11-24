@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 
 let options = LaunchOptions(CommandLine.arguments)
 if let command = options.popupScreenCommand {
@@ -14,6 +15,17 @@ if options.printHotKey {
     Console.line("\(NewSessionHotKey.label) keyCode=\(NewSessionHotKey.keyCode) modifiers=\(NewSessionHotKey.modifiers)")
     exit(0)
 }
+if let preview = options.pickerListPreview {
+    _ = NSApplication.shared
+    let view = NewSessionView(model: NewSessionModel(starter: SessionSource.sample.startSession), onClose: {}).previewList(preview.kind)
+    let host = NSHostingView(rootView: view.padding(20).background(Color(white: 0.14)).preferredColorScheme(.dark))
+    host.frame = NSRect(origin: .zero, size: host.fittingSize)
+    if let bitmap = host.bitmapImageRepForCachingDisplay(in: host.bounds) {
+        host.cacheDisplay(in: host.bounds, to: bitmap)
+        try? bitmap.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: preview.path))
+    }
+    exit(0)
+}
 if options.printConfigDirs {
     ClaudeConfig.directories.forEach { Console.line($0.path) }
     exit(0)
@@ -25,7 +37,7 @@ if let id = options.resumeURLId {
 let source: SessionSource = options.useSample ? .sample : .live
 
 if let command = options.newSessionCommand {
-    let request = NewSessionRequest(folder: command.folder == "none" ? nil : command.folder, prompt: command.prompt, target: command.target)
+    let request = NewSessionRequest(folder: command.folder == "none" ? nil : command.folder, prompt: command.prompt, target: command.target, model: options.withModel, effort: options.withEffort)
     do { try NewSessionLauncher.validate(request) } catch {
         Console.line("error: \(error.localizedDescription)")
         exit(1)

@@ -8,6 +8,8 @@ enum NewSessionTarget: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    var supportsModelAndEffort: Bool { self != .desktop }
+
     var symbol: String {
         switch self {
         case .desktop: return "macwindow"
@@ -36,10 +38,47 @@ enum NewSessionTarget: String, CaseIterable, Identifiable {
     }
 }
 
+enum ModelChoice: String, CaseIterable, Identifiable {
+    case standard
+    case fable
+    case opus
+    case sonnet
+    case haiku
+
+    var id: String { rawValue }
+
+    var title: String { self == .standard ? "Default" : rawValue.capitalized }
+
+    var flagValue: String? { self == .standard ? nil : rawValue }
+}
+
+enum EffortChoice: String, CaseIterable, Identifiable {
+    case standard
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .standard: return "Default"
+        case .xhigh: return "Extra high"
+        default: return rawValue.capitalized
+        }
+    }
+
+    var flagValue: String? { self == .standard ? nil : rawValue }
+}
+
 struct NewSessionRequest: Equatable {
     let folder: String?
     let prompt: String
     let target: NewSessionTarget
+    var model: ModelChoice = .standard
+    var effort: EffortChoice = .standard
 }
 
 enum NewSessionError: LocalizedError, Equatable {
@@ -123,8 +162,12 @@ enum NewSessionLauncher {
         return String(firstLine.prefix(40))
     }
 
-    private static var extraArguments: String {
-        ProcessInfo.processInfo.environment["CLAUDE_TRACKER_CLAUDE_ARGS"] ?? ""
+    private static func extraArguments(for request: NewSessionRequest) -> String {
+        var parts = [String]()
+        if let model = request.model.flagValue { parts.append("--model \(shellQuote(model))") }
+        if let effort = request.effort.flagValue { parts.append("--effort \(shellQuote(effort))") }
+        if let extra = ProcessInfo.processInfo.environment["CLAUDE_TRACKER_CLAUDE_ARGS"], !extra.isEmpty { parts.append(extra) }
+        return parts.joined(separator: " ")
     }
 
     private static func changeDirectoryLine(for request: NewSessionRequest) -> String {
@@ -139,7 +182,7 @@ enum NewSessionLauncher {
         #!/bin/zsh
         \(changeDirectoryLine(for: request))
         command -v claude > /dev/null || { echo "Claude Code (claude) was not found in your PATH."; read -r; exit 1; }
-        exec claude \(extraArguments) -- \(shellQuote(request.prompt.trimmingCharacters(in: .whitespacesAndNewlines)))
+        exec claude \(extraArguments(for: request)) -- \(shellQuote(request.prompt.trimmingCharacters(in: .whitespacesAndNewlines)))
 
         """
     }
@@ -150,7 +193,7 @@ enum NewSessionLauncher {
         #!/bin/zsh
         \(changeDirectoryLine(for: request))
         command -v claude > /dev/null || { echo "claude not found"; exit 127; }
-        exec claude --bg --name \(shellQuote(sessionName(for: prompt))) \(extraArguments) -- \(shellQuote(prompt))
+        exec claude --bg --name \(shellQuote(sessionName(for: prompt))) \(extraArguments(for: request)) -- \(shellQuote(prompt))
 
         """
     }
@@ -270,9 +313,19 @@ enum NewSessionLauncher {
 
 final class NewSessionModel: ObservableObject {
     private static let targetKey = "newSessionTarget"
+    private static let modelKey = "newSessionModel"
+    private static let effortKey = "newSessionEffort"
 
     @Published var folder: String?
     @Published var prompt = ""
+    @Published var model: ModelChoice {
+        didSet { UserDefaults.standard.set(model.rawValue, forKey: Self.modelKey) }
+    }
+
+    @Published var effort: EffortChoice {
+        didSet { UserDefaults.standard.set(effort.rawValue, forKey: Self.effortKey) }
+    }
+
     @Published var target: NewSessionTarget {
         didSet { UserDefaults.standard.set(target.rawValue, forKey: Self.targetKey) }
     }
@@ -289,11 +342,15 @@ final class NewSessionModel: ObservableObject {
         let defaults = UserDefaults.standard
         folder = nil
         target = NewSessionTarget(rawValue: defaults.string(forKey: Self.targetKey) ?? "") ?? .desktop
+        model = ModelChoice(rawValue: defaults.string(forKey: Self.modelKey) ?? "") ?? .standard
+        effort = EffortChoice(rawValue: defaults.string(forKey: Self.effortKey) ?? "") ?? .standard
     }
 
     func forgetSavedChoices() {
         folder = nil
         target = .desktop
+        model = .standard
+        effort = .standard
     }
 
     func prepare() {
@@ -306,7 +363,7 @@ final class NewSessionModel: ObservableObject {
         guard !starting else { return }
         starting = true
         message = nil
-        starter(NewSessionRequest(folder: folder, prompt: prompt, target: target)) { [weak self] result in
+        starter(NewSessionRequest(folder: folder, prompt: prompt, target: target, model: model, effort: effort)) { [weak self] result in
             guard let self else { return }
             self.starting = false
             switch result {
