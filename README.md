@@ -59,7 +59,7 @@ gh release create v<version> dist/Claude-Tracker.zip dist/Claude-Tracker.zip.sha
 SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" NOTARY_PROFILE="my-notary-profile" scripts/package.sh
 ```
 
-This signs with the hardened runtime, submits to Apple's notary service and staples the result. That path is written but has not been tested (it needs a paid developer account). Change the bundle id (`com.local.claude-widget`) before a wider release, and add a license file.
+This signs with the hardened runtime, submits to Apple's notary service and staples the result. That path is written but has not been tested (it needs a paid developer account). Change the bundle id (`com.local.claude-widget`) before a wider release.
 
 ## Shortcuts and gestures
 
@@ -224,3 +224,7 @@ Not covered by automated tests: real ⌘Tab and clipboard-manager behaviour, rea
 - `Sources/`: the Swift app (`SessionRegistry` and `DesktopSessions` read state, `SessionStore` refreshes it, `WidgetView`, `ReplyView` and `AddSessionView` draw it, `WidgetApp` owns the windows).
 - `hook/`: the permission hook. `scripts/`: build, icon, and hook install/uninstall scripts. `scripts/icon-concepts.swift` only renders the icon design options.
 - `Info.plist`: the app is an accessory app (no Dock icon) that becomes a regular app while the popup is open.
+
+## License
+
+[MIT](LICENSE) © 2026 AliMsayleb
