@@ -34,6 +34,15 @@ if let id = options.resumeURLId {
     Console.line(NewSessionLauncher.resumeURL(sessionId: id)?.absoluteString ?? "nil")
     exit(0)
 }
+if let command = options.trustCommand {
+    Console.line(FolderTrust.trust(command[0]) ? "trusted" : "failed")
+    exit(0)
+}
+if let command = options.failureCommand {
+    let request = NewSessionRequest(folder: command[0], prompt: "hi", target: .background)
+    Console.line(NewSessionLauncher.failure(output: command[1], for: request).localizedDescription)
+    exit(0)
+}
 let source: SessionSource = options.useSample ? .sample : .live
 
 if let command = options.newSessionCommand {

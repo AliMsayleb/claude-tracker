@@ -492,6 +492,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             store.newSession.prompt = draft.prompt
         }
         if options.noFolder { store.newSession.folder = nil }
+        if options.previewUntrusted {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { [weak self] in
+                guard let model = self?.store.newSession else { return }
+                let folder = "/Users/me/projects/website"
+                model.folder = folder
+                model.untrustedFolder = folder
+                model.message = NewSessionError.untrustedFolder(folder).localizedDescription
+                model.messageIsError = true
+            }
+        }
         if let target = options.previewTarget { store.newSession.target = target }
         if options.openNewSession {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in self?.store.openNewSession() }

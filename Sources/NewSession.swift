@@ -86,6 +86,7 @@ enum NewSessionError: LocalizedError, Equatable {
     case promptTooLong(Int)
     case badFolder
     case claudeNotFound
+    case untrustedFolder(String)
     case launchFailed(String)
 
     var errorDescription: String? {
@@ -94,8 +95,32 @@ enum NewSessionError: LocalizedError, Equatable {
         case .promptTooLong(let limit): return "That prompt is too long for this option (limit \(limit) characters)."
         case .badFolder: return "Pick a folder that exists."
         case .claudeNotFound: return "Claude Code (claude) was not found. Install it, then try again."
+        case .untrustedFolder(let folder): return "Claude does not trust \(URL(fileURLWithPath: folder).lastPathComponent) yet."
         case .launchFailed(let detail): return "Could not start the session: \(detail)"
         }
+    }
+}
+
+enum FolderTrust {
+    static var settingsURL: URL {
+        ProcessInfo.processInfo.environment["CLAUDE_TRACKER_CLAUDE_JSON"].map { URL(fileURLWithPath: $0) }
+            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude.json")
+    }
+
+    static func trust(_ folder: String) -> Bool {
+        guard folder.hasPrefix("/"),
+              let data = try? Data(contentsOf: settingsURL),
+              var settings = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return false }
+        var projects = settings["projects"] as? [String: Any] ?? [:]
+        var entry = projects[folder] as? [String: Any] ?? [:]
+        entry["hasTrustDialogAccepted"] = true
+        projects[folder] = entry
+        settings["projects"] = projects
+        guard let updated = try? JSONSerialization.data(withJSONObject: settings, options: [.prettyPrinted, .withoutEscapingSlashes]),
+              (try? updated.write(to: settingsURL, options: .atomic)) != nil
+        else { return false }
+        return true
     }
 }
 
@@ -276,6 +301,11 @@ enum NewSessionLauncher {
         }
     }
 
+    static func failure(output: String, for request: NewSessionRequest) -> NewSessionError {
+        if output.contains("Workspace not trusted"), let folder = request.folder { return .untrustedFolder(folder) }
+        return .launchFailed(String(output.prefix(300)))
+    }
+
     private static func runInBackground(_ request: NewSessionRequest, completion: @escaping (Result<String, NewSessionError>) -> Void) {
         guard let file = writeScript(backgroundScript(for: request), named: "new-\(UUID().uuidString).sh") else {
             completion(.failure(.launchFailed("could not write the launch script")))
@@ -300,7 +330,7 @@ enum NewSessionLauncher {
                 } else if process.terminationStatus == 127 {
                     outcome = .failure(.claudeNotFound)
                 } else {
-                    outcome = .failure(.launchFailed(String(output.prefix(300))))
+                    outcome = .failure(failure(output: output, for: request))
                 }
             } catch {
                 outcome = .failure(.launchFailed(error.localizedDescription))
@@ -332,6 +362,7 @@ final class NewSessionModel: ObservableObject {
     @Published var message: String?
     @Published var messageIsError = false
     @Published var starting = false
+    @Published var untrustedFolder: String?
     @Published private(set) var recentFolders: [String] = []
 
     var onFinished: () -> Void = {}
@@ -356,13 +387,25 @@ final class NewSessionModel: ObservableObject {
     func prepare() {
         recentFolders = NewSessionLauncher.recentFolders()
         message = nil
+        untrustedFolder = nil
         starting = false
+    }
+
+    func trustFolderAndStart() {
+        guard let folder = untrustedFolder else { return }
+        guard FolderTrust.trust(folder) else {
+            message = "Could not update Claude's settings. Run claude in that folder once and accept its prompt."
+            untrustedFolder = nil
+            return
+        }
+        start()
     }
 
     func start() {
         guard !starting else { return }
         starting = true
         message = nil
+        untrustedFolder = nil
         starter(NewSessionRequest(folder: folder, prompt: prompt, target: target, model: model, effort: effort)) { [weak self] result in
             guard let self else { return }
             self.starting = false
@@ -371,6 +414,7 @@ final class NewSessionModel: ObservableObject {
                 self.prompt = ""
                 self.onFinished()
             case .failure(let error):
+                if case .untrustedFolder(let folder) = error { self.untrustedFolder = folder }
                 self.message = error.localizedDescription
                 self.messageIsError = true
             }

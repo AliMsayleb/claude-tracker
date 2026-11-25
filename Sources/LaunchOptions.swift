@@ -26,6 +26,9 @@ struct LaunchOptions {
     let draft: (folder: String, prompt: String)?
     let startTarget: NewSessionTarget?
     let resumeURLId: String?
+    let trustCommand: [String]?
+    let failureCommand: [String]?
+    let previewUntrusted: Bool
     let popupScreenCommand: [String]?
     let testHotKey: Bool
     let printHotKey: Bool
@@ -86,6 +89,9 @@ struct LaunchOptions {
         popupScreenCommand = Self.values(after: "--print-popup-screen", count: 2, in: arguments)
         testHotKey = arguments.contains("--test-hotkey")
         printHotKey = arguments.contains("--print-hotkey")
+        trustCommand = Self.values(after: "--print-trust-folder", count: 1, in: arguments)
+        failureCommand = Self.values(after: "--print-launch-failure", count: 2, in: arguments)
+        previewUntrusted = arguments.contains("--preview-untrusted")
         resumeURLId = Self.values(after: "--print-resume-url", count: 1, in: arguments)?.first
         startCollapsed = arguments.contains("--start-collapsed")
         updateCommand = arguments.firstIndex { ["--check-update", "--download-update", "--print-update-script", "--test-version-compare"].contains($0) }

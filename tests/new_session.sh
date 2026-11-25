@@ -91,4 +91,16 @@ for target in terminal background; do
   check "$target: no model or effort flags unless chosen" "0" "$(grep -c -e '--model' -e '--effort' "$work/default-$target.sh")"
 done
 
+check "an untrusted-folder failure is recognised" "Claude does not trust my-app yet." "$("$binary" --print-launch-failure /x/my-app "Workspace not trusted. Run claude once")"
+check "other failures keep their message" "Could not start the session: boom" "$("$binary" --print-launch-failure /x/my-app "boom")"
+echo '{"numStartups": 3, "projects": {"/other": {"allowedTools": []}}}' > "$work/trust.json"
+check "trusting a folder reports success" "trusted" "$(CLAUDE_TRACKER_CLAUDE_JSON="$work/trust.json" "$binary" --print-trust-folder /x/my-app)"
+check "trusting writes the flag and keeps everything else" "True|3|True" "$(python3 -I -c "
+import json
+d = json.load(open('$work/trust.json'))
+print('|'.join([str(d['projects']['/x/my-app']['hasTrustDialogAccepted']), str(d['numStartups']), str('allowedTools' in d['projects']['/other'])]))")"
+check "trusting fails cleanly when the settings file is missing" "failed" "$(CLAUDE_TRACKER_CLAUDE_JSON="$work/missing.json" "$binary" --print-trust-folder /x/my-app)"
+timeout 20 "$binary" --sample --open-new-session --preview-untrusted --snapshot "$work/untrusted.png" > /dev/null
+check "the new-session window shows the trust button" "yes" "$([ -f "$work/untrusted.png-newsession.png" ] && echo yes || echo no)"
+
 finish

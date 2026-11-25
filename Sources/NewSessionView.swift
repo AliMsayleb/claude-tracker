@@ -62,7 +62,14 @@ struct NewSessionView: View {
                 }
             }
             if let message = model.message {
-                Text(message).font(.system(size: 13)).foregroundStyle(model.messageIsError ? Color.red : Color.secondary)
+                HStack(spacing: 12) {
+                    Text(message).font(.system(size: 13)).foregroundStyle(model.messageIsError ? Color.red : Color.secondary)
+                    Spacer()
+                    if model.untrustedFolder != nil {
+                        Button("Trust this folder") { model.trustFolderAndStart() }
+                            .buttonStyle(ActionButtonStyle(color: ReplyMetrics.accent))
+                    }
+                }
             }
             HStack {
                 Text("Return to start · Shift-Return for a new line").font(.system(size: 12)).foregroundStyle(.tertiary)
